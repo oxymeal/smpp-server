@@ -22,7 +22,7 @@ class Deliverer:
     # Аргументы метода надо будет дописать по мере наобходимости.
     # Возможно, стоит создать структуру для передачи всех необходимых данных.
     def deliver(self, *args):
-        raise NotADirectoryError('deliver')
+        raise NotImplementedError('deliver')
 
 
 class Dispatcher:
