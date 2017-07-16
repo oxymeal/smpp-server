@@ -99,7 +99,7 @@ class PDU:
         self.command_status = cs
         self.sequence_number = sn
 
-        return bs[:size]
+        return bs[size:]
 
     def _pack_header(self) -> bytearray:
         """
@@ -132,6 +132,7 @@ class EnquireLinkResp(PDU):
     command = Command.ENQUIRE_LINK_RESP
 
     def __init__(self):
+        super().__init__()
         self.command_status = 0
         self.sequence_number = 0
 
