@@ -121,7 +121,7 @@ class EnquireLink(PDU):
         return self._pack_header()
 
     @classmethod
-    def unpack(cls, instance, bs: bytearray) -> 'EnquireLink':
+    def unpack(cls, bs: bytearray) -> 'EnquireLink':
         p = EnquireLink()
         p._unpack_header(bs)
         return p
