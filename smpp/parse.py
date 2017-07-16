@@ -98,3 +98,10 @@ class PDU:
         self.sequence_number = sn
 
         return bs[:size]
+
+    def _pack_header(self) -> bytearray:
+        """
+        Запаковывает заголовок пакета в массив байтов.
+        """
+        return struct.pack("!IIII", self.command_length, self.command,
+                           self.command_status, self.sequence_number)
