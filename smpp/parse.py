@@ -125,3 +125,25 @@ class EnquireLink(PDU):
         p = EnquireLink()
         p._unpack_header(bs)
         return p
+
+
+class EnquireLinkResp(PDU):
+
+    command = Command.ENQUIRE_LINK_RESP
+
+    def __init__(self):
+        self.command_status = 0
+        self.sequence_number = 0
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'EnquireLinkResp':
+        p = EnquireLinkResp()
+        p._unpack_header(bs)
+        return p
