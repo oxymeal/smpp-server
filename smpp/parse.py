@@ -105,3 +105,14 @@ class PDU:
         """
         return struct.pack("!IIII", self.command_length, self.command,
                            self.command_status, self.sequence_number)
+
+
+class EnquireLink(PDU):
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+    @classmethod
+    def unpack(cls, instance, bs: bytearray) -> 'EnquireLink':
+        p = EnquireLink()
+        p._unpack_header(bs)
+        return p
