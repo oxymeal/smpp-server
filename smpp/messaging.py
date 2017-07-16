@@ -10,7 +10,18 @@ class ResponseSender:
     с данным интерфейсом, чтобы отправлять клиентам отчеты о доставке
     сообщений с режимом отправки "Store and Forward".
     """
-    def send(self, system_id: int, pdu: parse.PDU):
+
+    def send(self, pdu: parse.PDU):
+        """
+        Отправляет пакет клиенту по текущему соединению.
+        """
+        raise NotImplementedError('send')
+
+    def send_to_rcv(self, pdu: parse.PDU):
+        """
+        Отправляет пакет клиенту по существующим соединениям в режиме RECEIVER
+        с тем же system_id.
+        """
         raise NotImplementedError('send')
 
 
@@ -38,13 +49,12 @@ class Dispatcher:
     делать вызывающий код.
     """
 
-    def __init__(self, system_id: int, rs: ResponseSender, d: Deliverer):
+    def __init__(self, system_id: int, d: Deliverer):
         # system_id - идентификатор пользователя.
         self._system_id = system_id
-        self._rs = rs
         self._d = d
 
-    def receive(self, pdu: parse.PDU) -> Optional[parse.PDU]:
+    def receive(self, pdu: parse.PDU, rs: ResponseSender) -> Optional[parse.PDU]:
         """
         Обрабатывает очередной входящий пакет. Если на этот пакет следует
         какой-то ответ, метод его формирует и возвращает. Если ответа не следует,
@@ -52,4 +62,7 @@ class Dispatcher:
 
         Этот метод гарантировано не выбрасывает никаких исключений. В случае
         ошибки обработки он возвращает пакет GENERICK_NACK согласно протоколу.
+
+        Объект rs используется для ответа определенным пакетом в текущее соединение,
+        либо в соединения в режиме receiver.
         """
