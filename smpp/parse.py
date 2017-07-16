@@ -57,13 +57,16 @@ class PDU:
     command = Command.UNDEFINED
 
     def __init__(self):
-        self.command_length = 0
         self.command_status = 0
         self.sequence_number = 0
 
     @property
     def command_id(self) -> int:
         return self.command.value
+
+    @property
+    def command_length(self) -> int:
+        return NotImplementedError("command_length")
 
     # Этот метод экземпляра перезаписывается дочерними классами.
     def pack(self) -> bytearray:
@@ -91,8 +94,7 @@ class PDU:
         """
         size = struct.calcsize("!IIII")
 
-        cl, cid, cs, sn = struct.unpack("!IIII", bs[:size])
-        self.command_length = cl
+        _, cid, cs, sn = struct.unpack("!IIII", bs[:size])
         self.command = Command(cid)
         self.command_status = cs
         self.sequence_number = sn
@@ -108,6 +110,10 @@ class PDU:
 
 
 class EnquireLink(PDU):
+    @property
+    def command_length(self) -> int:
+        return 16
+
     def pack(self) -> bytearray:
         return self._pack_header()
 
