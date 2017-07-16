@@ -1,5 +1,5 @@
-from enum import Enum
 import struct
+from enum import Enum
 
 
 class Command(Enum):
