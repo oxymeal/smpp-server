@@ -54,7 +54,7 @@ class Dispatcher:
         self._system_id = system_id
         self._d = d
 
-    def receive(self, pdu: parse.PDU, rs: ResponseSender) -> Optional[parse.PDU]:
+    def receive(self, pdu: parse.PDU, rs: ResponseSender):
         """
         Обрабатывает очередной входящий пакет. Если на этот пакет следует
         какой-то ответ, метод его формирует и возвращает. Если ответа не следует,
