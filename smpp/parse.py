@@ -53,13 +53,13 @@ class PDU:
     Родительский класс всех классов пакетов SMPP.
     """
 
+    # Этот атрибут класса перезаписывается дочерними классами.
+    command = Command.UNDEFINED
+
     def __init__(self):
         self.command_length = 0
         self.command_status = 0
         self.sequence_number = 0
-
-    # Этот атрибут класса перезаписывается дочерними классами.
-    command = Command.UNDEFINED
 
     @property
     def command_id(self) -> int:
