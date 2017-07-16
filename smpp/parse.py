@@ -105,13 +105,13 @@ class PDU:
         """
         Запаковывает заголовок пакета в массив байтов.
         """
-        return struct.pack("!IIII", self.command_length, self.command,
+        return struct.pack("!IIII", self.command_length, self.command_id,
                            self.command_status, self.sequence_number)
 
 
 class EnquireLink(PDU):
 
-    self.command = Command.ENQUIRE_LINK
+    command = Command.ENQUIRE_LINK
 
     @property
     def command_length(self) -> int:
