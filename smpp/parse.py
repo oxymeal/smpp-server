@@ -1,4 +1,5 @@
 from enum import Enum
+import struct
 
 
 class Command(Enum):
@@ -52,6 +53,11 @@ class PDU:
     Родительский класс всех классов пакетов SMPP.
     """
 
+    def __init__(self):
+        self.command_length = 0
+        self.command_status = 0
+        self.sequence_number = 0
+
     # Этот атрибут класса перезаписывается дочерними классами.
     command = Command.UNDEFINED
 
@@ -77,3 +83,18 @@ class PDU:
         окажется недействительным), метод выбросит UnpackingError.
         """
         raise NotImplementedError('unpack')
+
+    def _unpack_header(self, bs: bytearray) -> bytearray:
+        """
+        Распаковывает заголовок каждого пакета в поля.
+        Возвращает байты тела пакета.
+        """
+        size = struct.calcsize("!IIII")
+
+        cl, cid, cs, sn = struct.unpack("!IIII", bs[:size])
+        self.command_length = cl
+        self.command = Command(cid)
+        self.command_status = cs
+        self.sequence_number = sn
+
+        return bs[:size]
