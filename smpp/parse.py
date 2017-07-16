@@ -110,6 +110,9 @@ class PDU:
 
 
 class EnquireLink(PDU):
+
+    self.command = Command.ENQUIRE_LINK
+
     @property
     def command_length(self) -> int:
         return 16
