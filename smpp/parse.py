@@ -376,6 +376,42 @@ class BindTransceiverResp(PDU):
         return response
 
 
+class Unbind(PDU):
+
+    command = Command.UNBIND
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'Unbind':
+        p = Unbind()
+        p._unpack_header(bs)
+        return p
+
+
+class UnbindResp(PDU):
+
+    command = Command.UNBIND_RESP
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'UnbindResp':
+        p = UnbindResp()
+        p._unpack_header(bs)
+        return p
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -385,14 +421,14 @@ _COMMAND_CLASSES = {
     Command.BIND_TRANSCEIVER_RESP: BindTransceiverResp,
     Command.ENQUIRE_LINK: EnquireLink,
     Command.ENQUIRE_LINK_RESP: EnquireLinkResp,
+    Command.UNBIND: Unbind,
+    Command.UNBIND_RESP: UnbindResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # SUBMIT_SM = 0x00000004
     # SUBMIT_SM_RESP = 0x80000004
     # DELIVER_SM = 0x00000005
     # DELIVER_SM_RESP = 0x80000005
-    # UNBIND = 0x00000006
-    # UNBIND_RESP = 0x80000006
     # REPLACE_SM = 0x00000007
     # REPLACE_SM_RESP = 0x80000007
     # CANCEL_SM = 0x00000008
