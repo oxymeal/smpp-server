@@ -202,3 +202,44 @@ class BindTransmitter(PDU):
         bs = bs[size:]
         pdu.address_range, _ = unpack_coctet_string(bs)
         return pdu
+
+
+class BindReceiver(PDU):
+
+    command = Command.BIND_RECEIVER
+
+    def __init__(self):
+        super().__init__()
+        self.system_id = ""
+        self.password = ""
+        self.system_type = ""
+        self.interface_version = 0
+        self.addr_ton = 0
+        self.addr_npi = 0
+        self.address_range = ""
+
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        sid_size = len(self.system_id) + 1
+        pwd_size = len(self.password) + 1
+        syt_size = len(self.system_type) + 1
+        iv_at_an_size = 3
+        adr_size = len(self.address_range) + 1
+        return header_size + sid_size + pwd_size + syt_size + iv_at_an_size + adr_size
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'BindReceiver':
+        pdu = BindReceiver()
+        bs = pdu._unpack_header(bs)
+        pdu.system_id, bs = unpack_coctet_string(bs)
+        pdu.password, bs = unpack_coctet_string(bs)
+        pdu.system_type, bs = unpack_coctet_string(bs)
+        size = struct.calcsize('!BBB')
+        iv, at, an = struct.unpack('!BBB', bs[:size])
+        pdu.interface_version = iv
+        pdu.addr_ton = at
+        pdu.addr_npi = an
+        bs = bs[size:]
+        pdu.address_range, _ = unpack_coctet_string(bs)
+        return pdu
