@@ -286,3 +286,33 @@ class BindTransceiver(PDU):
         return pdu
 
 
+# TODO: Сделать TLV.
+class BindTransmitterResp(PDU):
+
+    command = Command.BIND_TRANSMITTER_RESP
+
+    def __init__(self):
+        super().__init__()
+        self.system_id = ""
+
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        sid_size = len(self.system_id) + 1
+        return header_size + sid_size
+
+    def pack(self) -> bytearray:
+        response = bytearray()
+        bs = self._pack_header()
+        response += bs
+
+        system_id = self.system_id.encode("ascii")
+        if len(self.system_id) + 1 > 16:
+            raise PackingError(
+                "Systemd_id is longer than maximum allowed 16 bytes")
+        response += system_id
+
+        response += b'0'
+
+        return response
+
