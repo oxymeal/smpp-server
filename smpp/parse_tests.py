@@ -1,6 +1,6 @@
 import unittest
 
-from parse import *
+from .parse import *
 
 
 class ParserTestCase(unittest.TestCase):
@@ -48,7 +48,3 @@ class ParserTestCase(unittest.TestCase):
         self.assertEqual(pdu.addr_ton, addr_ton)
         self.assertEqual(pdu.addr_npi, addr_npi)
         self.assertEqual(pdu.address_range, address_range)
-
-
-if __name__ == '__main__':
-    unittest.main()
