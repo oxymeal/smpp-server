@@ -95,8 +95,7 @@ class PDU:
         """
         size = struct.calcsize("!IIII")
 
-        _, cid, cs, sn = struct.unpack("!IIII", bs[:size])
-        self.command = Command(cid)
+        _, _, cs, sn = struct.unpack("!IIII", bs[:size])
         self.command_status = cs
         self.sequence_number = sn
 
@@ -375,3 +374,43 @@ class BindTransceiverResp(PDU):
         response += b'0'
 
         return response
+
+
+_COMMAND_CLASSES = {
+    Command.BIND_RECEIVER: BindReceiver,
+    Command.BIND_RECEIVER_RESP: BindReceiverResp,
+    Command.BIND_TRANSMITTER: BindTransmitter,
+    Command.BIND_TRANSMITTER_RESP: BindTransmitterResp,
+    Command.BIND_TRANSCEIVER: BindTransceiver,
+    Command.BIND_TRANSCEIVER_RESP: BindTransceiverResp,
+    Command.ENQUIRE_LINK: EnquireLink,
+    Command.ENQUIRE_LINK_RESP: EnquireLinkResp,
+    # QUERY_SM = 0x00000003
+    # QUERY_SM_RESP = 0x80000003
+    # SUBMIT_SM = 0x00000004
+    # SUBMIT_SM_RESP = 0x80000004
+    # DELIVER_SM = 0x00000005
+    # DELIVER_SM_RESP = 0x80000005
+    # UNBIND = 0x00000006
+    # UNBIND_RESP = 0x80000006
+    # REPLACE_SM = 0x00000007
+    # REPLACE_SM_RESP = 0x80000007
+    # CANCEL_SM = 0x00000008
+    # CANCEL_SM_RESP = 0x80000008
+    # BIND_TRANSCEIVER = 0x00000009
+    # BIND_TRANSCEIVER_RESP = 0x80000009
+    # ENQUIRE_LINK = 0x00000015
+    # ENQUIRE_LINK_RESP = 0x80000015
+    # SUBMIT_MULTI = 0x00000021
+    # SUBMIT_MULTI_RESP = 0x80000021
+    # DATA_SM = 0x00000103
+    # DATA_SM_RESP = 0x80000103
+}
+
+
+def unpack_pdu(bs: bytearray) -> PDU:
+
+    size = struct.calcsize('!II')
+    _, cid = struct.unpack("!II", bs[:size])
+
+    return _COMMAND_CLASSES[Command(cid)].unpack(bs)
