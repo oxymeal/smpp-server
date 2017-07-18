@@ -1035,6 +1035,18 @@ class CancelSm(PDU):
         return pdu
 
 
+class CancelSmResp(PDU):
+
+    command = Command.CANCEL_SM_RESP
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -1058,6 +1070,7 @@ _COMMAND_CLASSES = {
     Command.QUERY_SM: QuerySm,
     Command.QUERY_SM_RESP: QuerySmResp,
     Command.CANCEL_SM: CancelSm,
+    Command.CANCEL_SM_RESP: CancelSmResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
