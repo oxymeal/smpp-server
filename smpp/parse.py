@@ -696,7 +696,7 @@ class SubmitMulti(PDU):
         pdu.source_addr_ton = sdt
         pdu.source_addr_npi = anp
         pdu.source_addr, bs = unpack_coctet_string(bs)
-        pdu.number_of_dests, bs = _unpack_fmt('!B', bs)
+        (pdu.number_of_dests), bs = _unpack_fmt('!B', bs)
 
         d = Dest()
         for dest in range(0, pdu.number_of_dests):
@@ -747,7 +747,7 @@ class UnsuccessDest(Dest):
         dest.dest_addr_npi = dat
         dest.dest_addr_ton = dan
         dest.destination_addr, bs = unpack_coctet_string(bs)
-        dest.error_status_code, bs = _unpack_fmt('!I', bs)
+        (dest.error_status_code), bs = _unpack_fmt('!I', bs)
         return dest, bs
 
 
