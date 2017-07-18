@@ -364,7 +364,7 @@ class BindTransmitterResp(PDU):
                 "Systemd_id is longer than maximum allowed 16 bytes")
         response += system_id
 
-        response += b'0'
+        response += b'\x00'
 
         return response
 
@@ -394,7 +394,7 @@ class BindReceiverResp(PDU):
                 "Systemd_id is longer than maximum allowed 16 bytes")
         response += system_id
 
-        response += b'0'
+        response += b'\x00'
 
         return response
 
@@ -424,7 +424,7 @@ class BindTransceiverResp(PDU):
                 "Systemd_id is longer than maximum allowed 16 bytes")
         response += system_id
 
-        response += b'0'
+        response += b'\x00'
 
         return response
 
