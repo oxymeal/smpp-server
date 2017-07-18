@@ -894,7 +894,7 @@ class DataSm(PDU):
         (dat, dan), bs = _unpack_fmt("!BB", bs)
         pdu.dest_addr_ton = dat
         pdu.dest_addr_npi = dan
-        pdu.destination_addrm, bs = unpack_coctet_string(bs)
+        pdu.destination_addr, bs = unpack_coctet_string(bs)
         (ec, rd, dc), bs = _unpack_fmt("!BBB", bs)
         pdu.esm_class = ec
         pdu.registered_delivery = rd
