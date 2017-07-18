@@ -1,6 +1,6 @@
 import struct
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, Any
 
 
 class Command(Enum):
@@ -95,7 +95,13 @@ class PDU:
         """
         size = struct.calcsize("!IIII")
 
-        _, _, cs, sn = struct.unpack("!IIII", bs[:size])
+        ps, cid, cs, sn = struct.unpack("!IIII", bs[:size])
+        if len(bs) != ps:
+            raise UnpackingError(
+                "The size of the package does not coincide with the received")
+        if self.command_id != cid:
+            raise UnpackingError(
+                "The command identifier does not match the received")
         self.command_status = cs
         self.sequence_number = sn
 
@@ -150,16 +156,24 @@ class EnquireLinkResp(PDU):
         return p
 
 
+def _unpack_fmt(fmt: str, bs: bytearray) -> Tuple[Tuple[Any], bytearray]:
+    size = struct.calcsize(fmt)
+
+    if len(bs) <= size:
+        raise UnpackingError("The package size does not match the expected")
+
+    params = struct.unpack(fmt, bs[:size])
+
+    return params, bs[size:]
+
+
 def unpack_coctet_string(bs: bytearray) -> Tuple[str, bytearray]:
     string = bytearray()
     for byte in bs:
-        # print(byte)
-        # data, = struct.unpack('B', byte)
-        if byte != 0:
-            string.append(byte)
-            continue
-        break
-    return string.decode('ascii'), bs[len(string) + 1:]
+        if byte == 0:
+            return string.decode('ascii'), bs[len(string) + 1:]
+        string.append(byte)
+    raise UnpackingError("Null byte has not been reached")
 
 
 class BindTransmitter(PDU):
@@ -193,12 +207,10 @@ class BindTransmitter(PDU):
         pdu.system_id, bs = unpack_coctet_string(bs)
         pdu.password, bs = unpack_coctet_string(bs)
         pdu.system_type, bs = unpack_coctet_string(bs)
-        size = struct.calcsize('!BBB')
-        iv, at, an = struct.unpack('!BBB', bs[:size])
+        (iv, at, an), bs = _unpack_fmt('!BBB', bs)
         pdu.interface_version = iv
         pdu.addr_ton = at
         pdu.addr_npi = an
-        bs = bs[size:]
         pdu.address_range, _ = unpack_coctet_string(bs)
         return pdu
 
@@ -234,12 +246,10 @@ class BindReceiver(PDU):
         pdu.system_id, bs = unpack_coctet_string(bs)
         pdu.password, bs = unpack_coctet_string(bs)
         pdu.system_type, bs = unpack_coctet_string(bs)
-        size = struct.calcsize('!BBB')
-        iv, at, an = struct.unpack('!BBB', bs[:size])
+        (iv, at, an), bs = _unpack_fmt('!BBB', bs)
         pdu.interface_version = iv
         pdu.addr_ton = at
         pdu.addr_npi = an
-        bs = bs[size:]
         pdu.address_range, _ = unpack_coctet_string(bs)
         return pdu
 
@@ -275,12 +285,10 @@ class BindTransceiver(PDU):
         pdu.system_id, bs = unpack_coctet_string(bs)
         pdu.password, bs = unpack_coctet_string(bs)
         pdu.system_type, bs = unpack_coctet_string(bs)
-        size = struct.calcsize('!BBB')
-        iv, at, an = struct.unpack('!BBB', bs[:size])
+        (iv, at, an), bs = _unpack_fmt('!BBB', bs)
         pdu.interface_version = iv
         pdu.addr_ton = at
         pdu.addr_npi = an
-        bs = bs[size:]
         pdu.address_range, _ = unpack_coctet_string(bs)
         return pdu
 
