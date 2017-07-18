@@ -830,6 +830,55 @@ class DeliverSmResp(PDU):
         return bs
 
 
+class DataSm(PDU):
+
+    command = Command.DATA_SM
+
+    def __init__(self):
+        super().__init__()
+        self.service_type = ""
+        self.source_addr_ton = 0
+        self.source_addr_npi = 0
+        self.source_addr = ""
+        self.dest_addr_ton = 0
+        self.dest_addr_npi = 0
+        self.destination_addr = ""
+        self.esm_class = 0
+        self.registered_delivery = 0
+        self.data_coding = 0
+
+    @property
+    def command_length(self) -> int:
+        head_size = 16
+        st_size = len(self.service_type) + 1
+        sat_size = 1
+        san_size = 1
+        sa_size = len(self.source_addr) + 1
+        dat_size = 1
+        dan_size = 1
+        da_size = len(self.destination_addr) + 1
+        ec_size = 1
+        rd_size = 1
+        dc_size = 1
+        return head_size + st_size + sat_size\
+                 + san_size + sa_size + dat_size\
+                 + dan_size + da_size + ec_size\
+                 + rd_size + dc_size
+
+    def unpack(bs: bytearray) -> 'DataSm':
+        response = bytearray()
+        response += self._pack_header()
+        response += _pack_str(self.service_type, 6)
+        response += _pack_fmt("!BB", self.source_addr_ton,
+                              self.source_addr_npi)
+        response += _pack_str(self.source_addr, 65)
+        response += _pack_fmt("!BB", self.dest_addr_ton, self.dest_addr_npi)
+        response += _pack_str(self.destination_addr, 65)
+        response += _pack_fmt("!BBB", self.esm_class, self.registered_delivery,
+                              self.data_coding)
+        return response
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -848,6 +897,7 @@ _COMMAND_CLASSES = {
     Command.SUBMIT_MULTI_RESP: SubmitMultiResp,
     Command.DELIVER_SM: DeliverSm,
     Command.DELIVER_SM_RESP: DeliverSmResp,
+    Command.DATA_SM: DataSm,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
