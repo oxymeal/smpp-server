@@ -49,7 +49,7 @@ class Dispatcher:
     делать вызывающий код.
     """
 
-    def __init__(self, system_id: int, d: Deliverer):
+    def __init__(self, system_id: str, d: Deliverer):
         # system_id - идентификатор пользователя.
         self._system_id = system_id
         self._d = d

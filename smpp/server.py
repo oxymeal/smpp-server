@@ -58,7 +58,7 @@ class Server:
         # Maps system_ids to client objects.
         self._clients = {} # type: Dict[str, Client]
 
-    def _bind(self, conn: Connection, m: Mode, sid: int):
+    def _bind(self, conn: Connection, m: Mode, sid: str):
         self._unbind(conn)
 
         conn.mode = m
