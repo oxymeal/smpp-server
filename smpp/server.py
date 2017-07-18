@@ -32,8 +32,14 @@ class BoundResponseSender:
         try:
             pdu_bytes = pdu.pack()
         except parse.PackingError:
-            # TODO: Return g-back
-            raise
+            if pdu.command == parse.Command.GENERIC_NACK:
+                raise
+
+            nack = parse.GenericNack()
+            nack.sequence_number = pdu.sequence_number
+            nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+            await self.send(nack)
+            return
 
         self.conn.w.write(pdu_bytes)
         await self.conn.w.drain()
@@ -119,6 +125,8 @@ class Server:
         raise NotImplementedError('not yet implemented for other commands')
 
     async def _on_client_connected(self, conn: Connection):
+        brs = BoundResponseSender(self, conn)
+
         try:
             while True:
                 pdu_len_b = await conn.r.readexactly(4)
@@ -136,10 +144,12 @@ class Server:
                 try:
                     pdu = parse.unpack_pdu(pdu_bytes)
                 except parse.UnpackingError:
-                    # TODO: Return g-nack
-                    raise
+                    nack = parse.GenericNack()
+                    nack.sequence_number = 0
+                    nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+                    await brs.send(nack)
+                    continue
 
-                brs = BoundResponseSender(self, conn)
                 await self._dispatch_pdu(brs, pdu)
 
         except asyncio.IncompleteReadError:
