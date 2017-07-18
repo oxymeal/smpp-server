@@ -14,24 +14,16 @@ class Mode(Enum):
 
 
 class Connection:
-    def __init__(self, r: asyncio.StreamReader, w: asyncio.StreamWriter,
+    def __init__(self, server: 'Server', r: asyncio.StreamReader, w: asyncio.StreamWriter,
                  client: 'Client' = None):
-        self.mode = Mode.UNBOUND
-        self.client = client
+        self.server = server
         self.r = r
         self.w = w
+        self.mode = Mode.UNBOUND
+        self.client = client
 
     def __repr__(self) -> str:
         return "Connection({})".format(self.mode)
-
-    def can_transmit(self) -> bool:
-        return self.mode in [Mode.TRANSMITTER, Mode.TRANSCEIVER]
-
-
-class BoundResponseSender:
-    def __init__(self, server: 'Server', conn: Connection):
-        self.server = server
-        self.conn = conn
 
     async def send(self, pdu: parse.PDU):
         try:
@@ -46,8 +38,11 @@ class BoundResponseSender:
             await self.send(nack)
             return
 
-        self.conn.w.write(pdu_bytes)
-        await self.conn.w.drain()
+        self.w.write(pdu_bytes)
+        await self.w.drain()
+
+    def can_transmit(self) -> bool:
+        return self.mode in [Mode.TRANSMITTER, Mode.TRANSCEIVER]
 
 
 class Client:
@@ -95,55 +90,53 @@ class Server:
         for sid in remove_sids:
             del self._clients[sid]
 
-    async def _dispatch_pdu(self, brs: BoundResponseSender, pdu: parse.PDU):
+    async def _dispatch_pdu(self, conn: Connection, pdu: parse.PDU):
         if pdu.command == parse.Command.ENQUIRE_LINK:
             resp = parse.EnquireLinkResp()
             resp.sequence_number = pdu.sequence_number
-            await brs.send(resp)
+            await conn.send(resp)
             return
         elif pdu.command == parse.Command.BIND_RECEIVER:
-            self._bind(brs.conn, Mode.RECEIVER, pdu.system_id, pdu.password)
+            self._bind(conn, Mode.RECEIVER, pdu.system_id, pdu.password)
             resp = parse.BindReceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
-            await brs.send(resp)
+            await conn.send(resp)
             return
         elif pdu.command == parse.Command.BIND_TRANSMITTER:
-            self._bind(brs.conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
+            self._bind(conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
             resp = parse.BindTransmitterResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
-            await brs.send(resp)
+            await conn.send(resp)
             return
         elif pdu.command == parse.Command.BIND_TRANSCEIVER:
-            self._bind(brs.conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
+            self._bind(conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
             resp = parse.BindTransceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
-            await brs.send(resp)
+            await conn.send(resp)
             return
         elif pdu.command == parse.Command.UNBIND:
-            self._unbind(brs.conn)
+            self._unbind(conn)
             resp = parse.UnbindResp()
             resp.sequence_number = pdu.sequence_number
-            await brs.send(resp)
+            await conn.send(resp)
             return
 
-        if not brs.conn.can_transmit():
+        if not conn.can_transmit():
             # TODO: Check the command.
             # Some receiver responses must be allowed here.
             nack = parse.GenericNack()
             nack.sequence_number = pdu.sequence_number
             # Invalid bind status
             nack.command_status = parse.COMMAND_STATUS_ESME_RINVBNDSTS
-            await brs.send(nack)
+            await conn.send(nack)
             return
 
-        await brs.conn.client.mdispatcher.receive(pdu, brs)
+        await conn.client.mdispatcher.receive(pdu, conn)
 
     async def _on_client_connected(self, conn: Connection):
-        brs = BoundResponseSender(self, conn)
-
         try:
             while True:
                 pdu_len_b = await conn.r.readexactly(4)
@@ -164,10 +157,10 @@ class Server:
                     nack = parse.GenericNack()
                     nack.sequence_number = 0
                     nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
-                    await brs.send(nack)
+                    await conn.send(nack)
                     continue
 
-                await self._dispatch_pdu(brs, pdu)
+                await self._dispatch_pdu(conn, pdu)
 
         except asyncio.IncompleteReadError:
             pass
@@ -178,7 +171,7 @@ class Server:
 
     async def start(self):
         async def conncb(r: asyncio.StreamReader, w: asyncio.StreamWriter):
-            conn = Connection(r, w)
+            conn = Connection(self, r, w)
             await self._on_client_connected(conn)
 
         await asyncio.start_server(conncb, self.host, self.port)
