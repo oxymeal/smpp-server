@@ -572,6 +572,9 @@ class SubmitSm(PDU):
         pdu.dest_addr_npi = dan
         pdu.destination_addr, bs = unpack_coctet_string(bs)
         (ec, pid, pf), bs = _unpack_fmt('!BBB', bs)
+        pdu.esm_class = ec
+        pdu.protocol_id = pid
+        pdu.priority_flag = pf
         pdu.schedule_delivery_time, bs = unpack_coctet_string(bs)
         pdu.validity_period, bs = unpack_coctet_string(bs)
         (rd, ripf, dc, smdi, sl), bs = _unpack_fmt('!BBBBB', bs)
