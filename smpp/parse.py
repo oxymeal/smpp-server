@@ -494,6 +494,7 @@ _COMMAND_CLASSES = {
     Command.ENQUIRE_LINK_RESP: EnquireLinkResp,
     Command.UNBIND: Unbind,
     Command.UNBIND_RESP: UnbindResp,
+    Command.GENERIC_NACK: GenericNack,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # SUBMIT_SM = 0x00000004
