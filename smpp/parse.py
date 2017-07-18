@@ -221,6 +221,14 @@ def unpack_coctet_string(bs: bytearray) -> Tuple[str, bytearray]:
     raise UnpackingError("Null byte has not been reached")
 
 
+def _pack_str(input_str: str, max_size: int) -> bytearray:
+    input_str = st.encode('ascii')
+    input_str += b'\x00'
+    if len(input_str) > max_size:
+        raise PackingError("Field size too long")
+    return input_str
+
+
 class BindTransmitter(PDU):
 
     command = Command.BIND_TRANSMITTER
@@ -358,13 +366,7 @@ class BindTransmitterResp(PDU):
         bs = self._pack_header()
         response += bs
 
-        system_id = self.system_id.encode("ascii")
-        if len(self.system_id) + 1 > 16:
-            raise PackingError(
-                "Systemd_id is longer than maximum allowed 16 bytes")
-        response += system_id
-
-        response += b'\x00'
+        response += _pack_str(self.system_id, 16)
 
         return response
 
@@ -388,13 +390,7 @@ class BindReceiverResp(PDU):
         bs = self._pack_header()
         response += bs
 
-        system_id = self.system_id.encode("ascii")
-        if len(self.system_id) + 1 > 16:
-            raise PackingError(
-                "Systemd_id is longer than maximum allowed 16 bytes")
-        response += system_id
-
-        response += b'\x00'
+        response += _pack_str(self.system_id, 16)
 
         return response
 
@@ -418,13 +414,7 @@ class BindTransceiverResp(PDU):
         bs = self._pack_header()
         response += bs
 
-        system_id = self.system_id.encode("ascii")
-        if len(self.system_id) + 1 > 16:
-            raise PackingError(
-                "Systemd_id is longer than maximum allowed 16 bytes")
-        response += system_id
-
-        response += b'\x00'
+        response += _pack_str(self.system_id, 16)
 
         return response
 
