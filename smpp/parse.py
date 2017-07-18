@@ -492,6 +492,7 @@ class SubmitSm(PDU):
     command = Command.SUBMIT_SM
 
     def __init__(self):
+        super().__init__()
         self.service_type = ""
         self.source_addr_ton = 0
         self.source_addr_npi = 0
@@ -593,6 +594,7 @@ class SubmitSmResp(PDU):
     command = Command.SUBMIT_SM_RESP
 
     def __init__(self):
+        super().__init__()
         self.message_id = ""
 
     @property
@@ -636,6 +638,7 @@ class SubmitMulti(PDU):
     command = Command.SUBMIT_MULTI
 
     def __init__(self):
+        super().__init__()
         self.service_type = ""
         self.source_addr_ton = 0
         self.source_addr_npi = 0
