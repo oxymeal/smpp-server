@@ -415,6 +415,24 @@ class UnbindResp(PDU):
         return p
 
 
+class GenericNack(PDU):
+
+    command = Command.GENERIC_NACK
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'GenericNack':
+        p = GenericNack()
+        p._unpack_header(bs)
+        return p
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
