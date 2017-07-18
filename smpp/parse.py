@@ -881,18 +881,26 @@ class DataSm(PDU):
                  + dan_size + da_size + ec_size\
                  + rd_size + dc_size
 
-    def unpack(bs: bytearray) -> 'DataSm':
-        response = bytearray()
-        response += self._pack_header()
-        response += _pack_str(self.service_type, 6)
-        response += _pack_fmt("!BB", self.source_addr_ton,
-                              self.source_addr_npi)
-        response += _pack_str(self.source_addr, 65)
-        response += _pack_fmt("!BB", self.dest_addr_ton, self.dest_addr_npi)
-        response += _pack_str(self.destination_addr, 65)
-        response += _pack_fmt("!BBB", self.esm_class, self.registered_delivery,
-                              self.data_coding)
-        return response
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'DataSm':
+        pdu = DataSm()
+
+        pdu._unpack_header(bs)
+        pdu.service_type, bs = unpack_coctet_string(bs)
+        (sat, san), bs = _unpack_fmt("!BB", bs)
+        pdu.source_addr_ton = sat
+        pdu.source_addr_npi = san
+        pdu.source_addr, bs = unpack_coctet_string(bs)
+        (dat, dan), bs = _unpack_fmt("!BB", bs)
+        pdu.dest_addr_ton = dat
+        pdu.dest_addr_npi = dan
+        pdu.destination_addrm, bs = unpack_coctet_string(bs)
+        (ec, rd, dc), bs = _unpack_fmt("!BBB", bs)
+        pdu.esm_class = ec
+        pdu.registered_delivery = rd
+        pdu.data_coding = dc
+
+        return pdu
 
 
 class DataSmResp(PDU):
@@ -904,13 +912,13 @@ class DataSmResp(PDU):
         self.message_id = ""
 
     @property
-    def command_length(self):
+    def command_length(self) -> int:
         head_size = 16
         mid_size = len(self.message_id) + 1
         return head_size + mid_size
 
     def pack(self) -> bytearray:
-        bs = self._pack_header(bs)
+        bs = self._pack_header()
         bs += _pack_str(self.message_id, 65)
         return bs
 
@@ -940,7 +948,7 @@ class QuerySm(PDU):
     def unpack(cls, bs: bytearray) -> 'QuerySm':
         pdu = QuerySm()
 
-        pdu._unpack_header()
+        pdu._unpack_header(bs)
         pdu.message_id, bs = unpack_coctet_string(bs)
         (sat, san), bs = _unpack_fmt('!BB', bs)
         pdu.source_addr_ton = sat
