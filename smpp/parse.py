@@ -1102,6 +1102,17 @@ class ReplaceSm(PDU):
 
         return pdu
 
+class ReplaceSmResp(PDU):
+
+    command = Command.REPLACE_SM_RESP
+
+    @property
+    def command_length(self) -> int:
+        return 16
+
+    def pack(self) -> bytearray:
+        return self._pack_header()
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -1127,22 +1138,7 @@ _COMMAND_CLASSES = {
     Command.CANCEL_SM: CancelSm,
     Command.CANCEL_SM_RESP: CancelSmResp,
     Command.REPLACE_SM: ReplaceSm,
-    # QUERY_SM = 0x00000003
-    # QUERY_SM_RESP = 0x80000003
-    # DELIVER_SM = 0x00000005
-    # DELIVER_SM_RESP = 0x80000005
-    # REPLACE_SM = 0x00000007
-    # REPLACE_SM_RESP = 0x80000007
-    # CANCEL_SM = 0x00000008
-    # CANCEL_SM_RESP = 0x80000008
-    # BIND_TRANSCEIVER = 0x00000009
-    # BIND_TRANSCEIVER_RESP = 0x80000009
-    # ENQUIRE_LINK = 0x00000015
-    # ENQUIRE_LINK_RESP = 0x80000015
-    # SUBMIT_MULTI = 0x00000021
-    # SUBMIT_MULTI_RESP = 0x80000021
-    # DATA_SM = 0x00000103
-    # DATA_SM_RESP = 0x80000103
+    Command.REPLACE_SM_RESP: ReplaceSmResp,
 }
 
 
