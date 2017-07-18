@@ -3,7 +3,7 @@ import struct
 from collections import defaultdict
 from enum import Enum
 
-from . import parse
+from . import parse, messaging
 
 
 class Mode(Enum):
@@ -40,35 +40,49 @@ class BoundResponseSender:
         await self.conn.w.drain()
 
 
+class Client:
+    def __init__(self, system_id: str):
+        self.system_id = system_id
+        self.connections = set()
+        self._mdispatcher = messaging.Dispatcher(self.system_id, None)
+
+    def __repr__(self) -> str:
+        return "Client('{}', {})".format(self.system_id, self.connections)
+
+
 class Server:
     def __init__(self, host='0.0.0.0', port=2775):
         self.host = host
         self.port = port
 
-        # Maps system_ids to connections.
-        self._connections = defaultdict(set) # type: Dict[int, Set[Connection]]
+        # Maps system_ids to client objects.
+        self._clients = {} # type: Dict[str, Client]
 
     def _bind(self, conn: Connection, m: Mode, sid: int):
         self._unbind(conn)
 
         conn.mode = m
         conn.system_id = sid
-        self._connections[sid].add(conn)
+
+        if sid not in self._clients:
+            self._clients[sid] = Client(sid)
+
+        self._clients[sid].connections.add(conn)
 
     def _unbind(self, conn: Connection):
         conn.mode = Mode.UNBOUND
         conn.system_id = None
 
         remove_sids = set()
-        for sid, _conns in self._connections.items():
-            if conn in _conns:
-                _conns.remove(conn)
+        for sid, client in self._clients.items():
+            if conn in client.connections:
+                client.connections.remove(conn)
 
-            if len(_conns) == 0:
+            if len(client.connections) == 0:
                 remove_sids.add(sid)
 
         for sid in remove_sids:
-            del self._connections[sid]
+            del self._clients[sid]
 
     async def _dispatch_pdu(self, brs: BoundResponseSender, pdu: parse.PDU):
         if pdu.command == parse.Command.ENQUIRE_LINK:
