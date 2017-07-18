@@ -72,3 +72,8 @@ class Dispatcher:
         либо в соединения в режиме receiver.
         """
         logger.info('Dispatching PDU {}'.format(pdu.command))
+
+        nack = parse.GenericNack()
+        nack.sequence_number = pdu.sequence_number
+        nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+        await rs.send_to_rcv(nack)
