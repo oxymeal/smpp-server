@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import struct
 from collections import defaultdict
 from enum import Enum
-from typing import Iterator, Tuple
+from typing import Iterator, Optional, Tuple
 
 from . import parse, messaging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Mode(Enum):
@@ -27,9 +31,15 @@ class Connection:
         return "Connection({})".format(self.mode)
 
     async def send(self, pdu: parse.PDU):
+        logger.debug('Sending {} for {} at {}'.format(
+            pdu.command, self.system_id, self.peer))
+
         try:
             pdu_bytes = pdu.pack()
-        except parse.PackingError:
+        except parse.PackingError as e:
+            logger.error('Error packing {} for {} at {}: {}'.format(
+                pdu.command, self.system_id, self.peer, e))
+
             if pdu.command == parse.Command.GENERIC_NACK:
                 raise
 
@@ -43,9 +53,23 @@ class Connection:
         await self.w.drain()
 
     async def send_to_rcv(self, pdu: parse.PDU):
-        recvs = self.server.get_receivers(self.client.system_id)
+        logger.debug('Sending {} for all receivers of {}'.format(
+            pdu.command, self.system_id))
+
+        recvs = self.server.get_receivers(self.system_id)
         tasks = [c.send(pdu) for c in recvs]
         await asyncio.gather(*tasks)
+
+    @property
+    def peer(self) -> Tuple[str, int]:
+        return self.w.get_extra_info('peername')
+
+    @property
+    def system_id(self) -> Optional[str]:
+        if not self.client:
+            return None
+
+        return self.client.system_id
 
     def can_transmit(self) -> bool:
         return self.mode in [Mode.TRANSMITTER, Mode.TRANSCEIVER]
@@ -108,6 +132,8 @@ class Server:
                 yield conn
 
     async def _dispatch_pdu(self, conn: Connection, pdu: parse.PDU):
+        logger.info('PDU {} from {}'.format(pdu.command, conn.peer))
+
         if pdu.command == parse.Command.ENQUIRE_LINK:
             resp = parse.EnquireLinkResp()
             resp.sequence_number = pdu.sequence_number
@@ -115,6 +141,7 @@ class Server:
             return
         elif pdu.command == parse.Command.BIND_RECEIVER:
             self._bind(conn, Mode.RECEIVER, pdu.system_id, pdu.password)
+            logger.info('Bound {} at {} as RECEIVER'.format(conn.system_id, conn.peer))
             resp = parse.BindReceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
@@ -122,6 +149,7 @@ class Server:
             return
         elif pdu.command == parse.Command.BIND_TRANSMITTER:
             self._bind(conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
+            logger.info('Bound {} at {} as TRANSMITTER'.format(conn.system_id, conn.peer))
             resp = parse.BindTransmitterResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
@@ -129,6 +157,7 @@ class Server:
             return
         elif pdu.command == parse.Command.BIND_TRANSCEIVER:
             self._bind(conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
+            logger.info('Bound {} at {} as TRANSCEIVER'.format(conn.system_id, conn.peer))
             resp = parse.BindTransceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
@@ -136,6 +165,7 @@ class Server:
             return
         elif pdu.command == parse.Command.UNBIND:
             self._unbind(conn)
+            logger.info('Unbound {}'.format(conn.peer))
             resp = parse.UnbindResp()
             resp.sequence_number = pdu.sequence_number
             await conn.send(resp)
@@ -144,6 +174,8 @@ class Server:
         if not conn.can_transmit():
             # TODO: Check the command.
             # Some receiver responses must be allowed here.
+            logger.error('Invalid bind status ({}) for command {} from {} at {}'.format(
+                conn.mode, pdu.command, conn.system_id, conn.peer))
             nack = parse.GenericNack()
             nack.sequence_number = pdu.sequence_number
             # Invalid bind status
@@ -154,23 +186,34 @@ class Server:
         await conn.client.mdispatcher.receive(pdu, conn)
 
     async def _on_client_connected(self, conn: Connection):
+        logger.info('New connection from {}'.format(conn.peer))
+
         try:
             while True:
                 pdu_len_b = await conn.r.readexactly(4)
                 if not pdu_len_b:
+                    logger.debug(
+                        'EOF while reading pdu length from {} at {}'.format(conn.system_id, conn.peer))
                     break
 
                 pdu_len, = struct.unpack("!I", pdu_len_b)
 
                 pdu_body = await conn.r.readexactly(pdu_len - 4)
                 if not pdu_body or len(pdu_body) < pdu_len - 4:
+                    logger.debug(
+                        'EOF while reading pdu from {} at {}'.format(conn.system_id, conn.peer))
                     break
 
                 pdu_bytes = pdu_len_b + pdu_body
+                logger.debug('PDU in {} bytes received from {} at {}'.format(
+                    len(pdu_bytes), conn.system_id, conn.peer))
 
                 try:
                     pdu = parse.unpack_pdu(pdu_bytes)
-                except parse.UnpackingError:
+                except parse.UnpackingError as e:
+                    logger.error(
+                        'Error while unpacking PDU bytes from {} at {}: {}'.format(
+                            conn.peer, conn.system_id, e))
                     nack = parse.GenericNack()
                     nack.sequence_number = 0
                     nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR

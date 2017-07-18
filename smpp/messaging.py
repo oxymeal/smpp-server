@@ -1,6 +1,10 @@
+import logging
 from typing import Optional
 
 from . import parse
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResponseSender:
@@ -67,3 +71,4 @@ class Dispatcher:
         Объект rs используется для ответа определенным пакетом в текущее соединение,
         либо в соединения в режиме receiver.
         """
+        logger.info('Dispatching PDU {}'.format(pdu.command))
