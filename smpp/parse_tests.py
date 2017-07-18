@@ -48,3 +48,22 @@ class ParserTestCase(unittest.TestCase):
         self.assertEqual(pdu.addr_ton, addr_ton)
         self.assertEqual(pdu.addr_npi, addr_npi)
         self.assertEqual(pdu.address_range, address_range)
+
+    def test_submit_sm_unpack(self):
+
+        h = b"\x00\x00\x00;\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x0b88005553535\x00\x00\x00\x00\x01\xdd\x0111\x0011\x00\x17\x02\x01\x00\x0bHello world"
+
+        pdu = unpack_pdu(h)
+        self.assertEqual(pdu.sequence_number, 1)
+        self.assertEqual(pdu.source_addr_ton, 0)
+        self.assertEqual(pdu.source_addr, "88005553535")
+        self.assertEqual(pdu.esm_class, 0)
+        self.assertEqual(pdu.protocol_id, 0)
+        self.assertEqual(pdu.priority_flag, 0)
+        self.assertEqual(pdu.schedule_delivery_time, "11")
+        self.assertEqual(pdu.validity_period, "11")
+        self.assertEqual(pdu.registered_delivery, 23)
+        self.assertEqual(pdu.replace_if_present_flag, 2)
+        self.assertEqual(pdu.data_coding, 1)
+        self.assertEqual(pdu.sm_default_msg_id, 0)
+        self.assertEqual(pdu.short_message, "Hello world")

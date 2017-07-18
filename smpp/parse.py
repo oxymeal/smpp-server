@@ -482,6 +482,11 @@ class GenericNack(PDU):
         return p
 
 
+def _unpack_octet_string(bs: bytearray,
+                         sm_length: int) -> Tuple[str, bytearray]:
+    return bs[:sm_length].decode('ascii'), bs[sm_length:]
+
+
 class SubmitSm(PDU):
 
     command = Command.SUBMIT_SM
@@ -551,6 +556,33 @@ class SubmitSm(PDU):
                               self.sm_default_msg_id, self.sm_length)
         response += _pack_str(self.short_message, 254)
         return response
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'SubmitSm':
+        pdu = SubmitSm()
+
+        bs = pdu._unpack_header(bs)
+        pdu.service_type, bs = unpack_coctet_string(bs)
+        (sdt, anp), bs = _unpack_fmt('!BB', bs)
+        pdu.source_addr_ton = sdt
+        pdu.source_addr_npi = anp
+        pdu.source_addr, bs = unpack_coctet_string(bs)
+        (dat, dan), bs = _unpack_fmt('!BB', bs)
+        pdu.dest_addr_ton = dat
+        pdu.dest_addr_npi = dan
+        pdu.destination_addr, bs = unpack_coctet_string(bs)
+        (ec, pid, pf), bs = _unpack_fmt('!BBB', bs)
+        pdu.schedule_delivery_time, bs = unpack_coctet_string(bs)
+        pdu.validity_period, bs = unpack_coctet_string(bs)
+        (rd, ripf, dc, smdi, sl), bs = _unpack_fmt('!BBBBB', bs)
+        pdu.registered_delivery = rd
+        pdu.replace_if_present_flag = ripf
+        pdu.data_coding = dc
+        pdu.sm_default_msg_id = smdi
+        pdu.sm_length = sl
+        pdu.short_message, _ = _unpack_octet_string(bs, pdu.sm_length)
+
+        return pdu
 
 
 _COMMAND_CLASSES = {
