@@ -879,6 +879,20 @@ class DataSm(PDU):
         return response
 
 
+class DataSmResp(PDU):
+
+    command = Command.DATA_SM_RESP
+
+    def __init__(self):
+        super().__init__()
+        self.message_id = ""
+
+    def pack(self) -> bytearray:
+        bs = self._pack_header(bs)
+        bs += _pack_str(self.message_id, 65)
+        return bs
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -898,6 +912,7 @@ _COMMAND_CLASSES = {
     Command.DELIVER_SM: DeliverSm,
     Command.DELIVER_SM_RESP: DeliverSmResp,
     Command.DATA_SM: DataSm,
+    Command.DATA_SM_RESP: DataSmResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
