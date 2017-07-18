@@ -720,6 +720,57 @@ class SubmitMulti(PDU):
         return pdu
 
 
+class UnsuccessDest(Dest):
+    def __init__(self):
+        super().__init__()
+        self.error_status_code = 0
+
+    @property
+    def size(self) -> int:
+        dat_size = 1
+        dan_size = 1
+        da_size = len(self.destination_addr) + 1
+        esc_size = 4
+        return dat_size + dan_size + da_size + esc_size
+
+    def pack(self) -> bytearray:
+        resp = bytearray()
+        resp += _pack_fmt("!BB", self.dest_addr_ton, self.dest_addr_npi)
+        resp += _pack_str(self.destination_addr, 21)
+        resp += _pack_fmt("!I", self.error_status_code)
+        return resp
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> Tuple['UnsuccessDest', bytearray]:
+        dest = UnsuccessDest()
+        (dat, dan), bs = _unpack_fmt('!BB', bs)
+        dest.dest_addr_npi = dat
+        dest.dest_addr_ton = dan
+        dest.destination_addr, bs = _unpack_octet_string(bs)
+        dest.error_status_code, bs = _unpack_fmt('!I', bs)
+        return dest, bs
+
+
+class SubmitMultiResp(PDU):
+
+    command = Command.SUBMIT_MULTI_RESP
+
+    def __init__(self):
+        super().__init__()
+        self.message_id = ""
+        self.unsuccess_smses = []
+
+    def pack(self) -> bytearray:
+        bs = self._pack_header(bs)
+        bs += _pack_str(self.message_id, 65)
+        bs += _pack_fmt("!B", len(self.unsuccess_smses))
+
+        un_dest = UnsuccessDest()
+        for un_dest in self.unsuccess_smses:
+            bs += un_dest.pack()
+        return bs
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -735,6 +786,7 @@ _COMMAND_CLASSES = {
     Command.SUBMIT_SM: SubmitSm,
     Command.SUBMIT_SM_RESP: SubmitSmResp,
     Command.SUBMIT_MULTI: SubmitMulti,
+    Command.SUBMIT_MULTI_RESP: SubmitMultiResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
