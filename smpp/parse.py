@@ -746,7 +746,7 @@ class UnsuccessDest(Dest):
         (dat, dan), bs = _unpack_fmt('!BB', bs)
         dest.dest_addr_npi = dat
         dest.dest_addr_ton = dan
-        dest.destination_addr, bs = _unpack_octet_string(bs)
+        dest.destination_addr, bs = unpack_coctet_string(bs)
         dest.error_status_code, bs = _unpack_fmt('!I', bs)
         return dest, bs
 
