@@ -16,12 +16,11 @@ class Mode(Enum):
 class Connection:
     def __init__(self, r: asyncio.StreamReader, w: asyncio.StreamWriter):
         self.mode = Mode.UNBOUND
-        self.system_id = None
         self.r = r
         self.w = w
 
     def __repr__(self) -> str:
-        return "Connection({}, {})".format(self.mode, self.system_id)
+        return "Connection({})".format(self.mode)
 
 
 class BoundResponseSender:
@@ -62,7 +61,6 @@ class Server:
         self._unbind(conn)
 
         conn.mode = m
-        conn.system_id = sid
 
         if sid not in self._clients:
             self._clients[sid] = Client(sid)
@@ -71,7 +69,6 @@ class Server:
 
     def _unbind(self, conn: Connection):
         conn.mode = Mode.UNBOUND
-        conn.system_id = None
 
         remove_sids = set()
         for sid, client in self._clients.items():
