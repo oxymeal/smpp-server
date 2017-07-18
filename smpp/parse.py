@@ -816,6 +816,20 @@ class DeliverSm(PDU):
         return pdu
 
 
+class DeliverSmResp(PDU):
+
+    command = Command.DELIVER_SM_RESP
+
+    def __init__(self):
+        super().__init__()
+        self.message_id = b'\x00'
+
+    def pack(self) -> bytearray:
+        bs = self._pack_header()
+        bs += self.message_id
+        return bs
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -833,6 +847,7 @@ _COMMAND_CLASSES = {
     Command.SUBMIT_MULTI: SubmitMulti,
     Command.SUBMIT_MULTI_RESP: SubmitMultiResp,
     Command.DELIVER_SM: DeliverSm,
+    Command.DELIVER_SM_RESP: DeliverSmResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
