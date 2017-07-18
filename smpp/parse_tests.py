@@ -7,7 +7,6 @@ class ParserTestCase(unittest.TestCase):
     def test_unpack_enquire_link(self):
 
         h = b'\x00\x00\x00\x10\x00\x00\x00\x15\x00\x00\x00\x00\x00\x00\x00\x01'
-        inp = bytearray(h)
 
         pdu = unpack_pdu(h)
 
@@ -22,7 +21,6 @@ class ParserTestCase(unittest.TestCase):
 
     def test_unpack_bind_transmitter(self):
         h = b"\x00\x00\x00'\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x02sys_id\x00pwd\x00type\x004\x16+adr\x00"
-        inp = bytearray(h)
 
         size = struct.calcsize("!IIII")
         cl, cid, cs, sn = struct.unpack("!IIII", h[:size])
