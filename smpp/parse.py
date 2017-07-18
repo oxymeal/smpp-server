@@ -137,11 +137,6 @@ class EnquireLinkResp(PDU):
 
     command = Command.ENQUIRE_LINK_RESP
 
-    def __init__(self):
-        super().__init__()
-        self.command_status = 0
-        self.sequence_number = 0
-
     @property
     def command_length(self) -> int:
         return 16
