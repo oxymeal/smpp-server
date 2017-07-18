@@ -915,6 +915,41 @@ class DataSmResp(PDU):
         return bs
 
 
+class QuerySm(PDU):
+
+    command = Command.QUERY_SM
+
+    def __init__(self):
+        super().__init__()
+        self.message_id = ""
+        self.source_addr_ton = 0
+        self.source_addr_npi = 0
+        self.source_addr = ""
+
+    @property
+    def command_length(self) -> int:
+        head_size = 16
+        mid_size = len(self.message_id) + 1
+        sat_size = 1
+        san_size = 1
+        sa_size = len(self.source_addr) + 1
+        return head_size + mid_size + sat_size\
+                 + san_size + sa_size
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'QuerySm':
+        pdu = QuerySm()
+
+        pdu._unpack_header()
+        pdu.message_id, bs = unpack_coctet_string(bs)
+        (sat, san), bs = _unpack_fmt('!BB', bs)
+        pdu.source_addr_ton = sat
+        pdu.source_addr_npi = san
+        pdu.source_addr, _ = unpack_coctet_string(bs)
+
+        return pdu
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -935,6 +970,7 @@ _COMMAND_CLASSES = {
     Command.DELIVER_SM_RESP: DeliverSmResp,
     Command.DATA_SM: DataSm,
     Command.DATA_SM_RESP: DataSmResp,
+    Command.QUERY_SM: QuerySm,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
