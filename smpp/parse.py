@@ -585,6 +585,26 @@ class SubmitSm(PDU):
         return pdu
 
 
+class SubmitSmResp(PDU):
+
+    command = Command.SUBMIT_SM_RESP
+
+    def __init__(self):
+        self.message_id = ""
+
+    @property
+    def command_length(self) -> int:
+        head_size = 16
+        mid_size = len(self.message_id) + 1
+        return head_size + mid_size
+
+    def pack(self) -> bytearray:
+        response = bytearray()
+        response += self._pack_header()
+        response += _pack_str(self.message_id, 65)
+        return response
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -598,9 +618,9 @@ _COMMAND_CLASSES = {
     Command.UNBIND_RESP: UnbindResp,
     Command.GENERIC_NACK: GenericNack,
     Command.SUBMIT_SM: SubmitSm,
+    Command.SUBMIT_SM_RESP: SubmitSmResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
-    # SUBMIT_SM_RESP = 0x80000004
     # DELIVER_SM = 0x00000005
     # DELIVER_SM_RESP = 0x80000005
     # REPLACE_SM = 0x00000007
