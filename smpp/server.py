@@ -49,6 +49,8 @@ class Server:
         self._connections = defaultdict(set) # type: Dict[int, Set[Connection]]
 
     def _bind(self, conn: Connection, m: Mode, sid: int):
+        self._unbind(conn)
+
         conn.mode = m
         conn.system_id = sid
         self._connections[sid].add(conn)
