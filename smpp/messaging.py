@@ -11,13 +11,13 @@ class ResponseSender:
     сообщений с режимом отправки "Store and Forward".
     """
 
-    def send(self, pdu: parse.PDU):
+    async def send(self, pdu: parse.PDU):
         """
         Отправляет пакет клиенту по текущему соединению.
         """
         raise NotImplementedError('send')
 
-    def send_to_rcv(self, pdu: parse.PDU):
+    async def send_to_rcv(self, pdu: parse.PDU):
         """
         Отправляет пакет клиенту по существующим соединениям в режиме RECEIVER
         с тем же system_id.
@@ -54,7 +54,7 @@ class Dispatcher:
         self._system_id = system_id
         self._d = d
 
-    def receive(self, pdu: parse.PDU, rs: ResponseSender):
+    async def receive(self, pdu: parse.PDU, rs: ResponseSender):
         """
         Обрабатывает очередной входящий пакет. Если на этот пакет следует
         какой-то ответ, метод его формирует и возвращает. Если ответа не следует,

@@ -3,6 +3,8 @@ import struct
 from collections import defaultdict
 from enum import Enum
 
+from . import parse
+
 
 class Mode(Enum):
     UNBOUND = 0
@@ -20,6 +22,22 @@ class Connection:
 
     def __repr__(self) -> str:
         return "Connection({}, {})".format(self.mode, self.system_id)
+
+
+class BoundResponseSender:
+    def __init__(self, s: 'Server', c: Connection):
+        self._s = s
+        self._c = c
+
+    async def send(self, pdu: parse.PDU):
+        try:
+            pdu_bytes = pdu.pack()
+        except parse.PackingError:
+            # TODO: Return g-back
+            raise
+
+        self._c.w.write(pdu_bytes)
+        await self._c.w.drain()
 
 
 class Server:
@@ -50,24 +68,39 @@ class Server:
         for sid in remove_sids:
             del self._connections[sid]
 
+    async def _dispatch_pdu(self, brs: BoundResponseSender, pdu: parse.PDU):
+        if pdu.command == parse.Command.ENQUIRE_LINK:
+            resp = parse.EnquireLinkResp()
+            resp.sequence_number = pdu.sequence_number
+            await brs.send(resp)
+            return
+
+        raise NotImplementedError('not yet implemented for other commands')
+
     async def _on_client_connected(self, conn: Connection):
         try:
             while True:
                 pdu_len_b = await conn.r.readexactly(4)
                 if not pdu_len_b:
-                    w.close()
-                    return
+                    break
 
                 pdu_len, = struct.unpack("!I", pdu_len_b)
 
                 pdu_body = await conn.r.readexactly(pdu_len - 4)
                 if not pdu_body or len(pdu_body) < pdu_len - 4:
-                    w.close()
-                    return
+                    break
 
-                pdu = pdu_len_b + pdu_body
+                pdu_bytes = pdu_len_b + pdu_body
 
-                print("Read pdu", len(pdu), "bytes long:", pdu)
+                try:
+                    pdu = parse.unpack_pdu(pdu_bytes)
+                except parse.UnpackingError:
+                    # TODO: Return g-nack
+                    raise
+
+                brs = BoundResponseSender(self, conn)
+                await self._dispatch_pdu(brs, pdu)
+
         except asyncio.IncompleteReadError:
             pass
 
