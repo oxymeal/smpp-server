@@ -8,7 +8,7 @@ class Command(Enum):
     Перечисление всех поддерживаемых команд и их CommandID.
     """
     UNDEFINED = -1
-    GENERICK_NACK = 0x80000000
+    GENERIC_NACK = 0x80000000
     BIND_RECEIVER = 0x00000001
     BIND_RECEIVER_RESP = 0x80000001
     BIND_TRANSMITTER = 0x00000002
