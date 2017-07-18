@@ -958,6 +958,34 @@ class QuerySm(PDU):
         return pdu
 
 
+class QuerySmResp(PDU):
+
+    command = Command.QUERY_SM_RESP
+
+    def __init__(self):
+        super().__init__()
+        self.message_id = ""
+        self.final_date = ""
+        self.message_state = 0
+        self.error_code = 0
+
+    @property
+    def command_length(self) -> int:
+        head_size = 16
+        mid_size = len(self.message_id) + 1
+        fd_size = len(self.final_date) + 1
+        ms_size = 1
+        ec_size = 1
+        return head_size + mid_size + fd_size + ms_size + ec_size
+
+    def pack(self) -> bytearray:
+        bs = self._pack_header(bs)
+        bs += _pack_str(self.message_id, 65)
+        bs += _pack_str(self.final_date, 17)
+        bs += _pack_fmt('!BB', self.message_state, self.error_code)
+        return bs
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -979,6 +1007,7 @@ _COMMAND_CLASSES = {
     Command.DATA_SM: DataSm,
     Command.DATA_SM_RESP: DataSmResp,
     Command.QUERY_SM: QuerySm,
+    Command.QUERY_SM_RESP: QuerySmResp,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
