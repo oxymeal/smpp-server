@@ -229,6 +229,15 @@ def _pack_str(input_str: str, max_size: int) -> bytearray:
     return input_str
 
 
+def _pack_fmt(fmt: str, *params) -> bytearray:
+    try:
+        b = struct.pack(fmt, *params)
+    except struct.error:
+        raise PackingError("Format {}, cannot pack with this params {}", fmt,
+                           params)
+    return b
+
+
 class BindTransmitter(PDU):
 
     command = Command.BIND_TRANSMITTER
@@ -473,6 +482,77 @@ class GenericNack(PDU):
         return p
 
 
+class SubmitSm(PDU):
+
+    command = Command.SUBMIT_SM
+
+    def __init__(self):
+        self.service_type = ""
+        self.source_addr_ton = 0
+        self.source_addr_npi = 0
+        self.source_addr = ""
+        self.dest_addr_ton = 0
+        self.dest_addr_npi = 0
+        self.destination_addr = ""
+        self.esm_class = 0
+        self.protocol_id = 0
+        self.priority_flag = 0
+        self.schedule_delivery_time = ""
+        self.validity_period = ""
+        self.registered_delivery = 0
+        self.replace_if_present_flag = 0
+        self.data_coding = 0
+        self.sm_default_msg_id = 0
+        self.sm_length = 0
+        self.short_message = ""
+
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        st_size = len(self.service_type) + 1
+        sat_size = 1  # self.source_addr_ton
+        san_size = 1  # self.source_addr_npi
+        sa_size = len(self.source_addr) + 1
+        dat_size = 1  # self.dest_addr_ton
+        dan_size = 1  # self.dest_addr_npi
+        da_size = len(self.destination_addr) + 1
+        ec_size = 1  # self.esm_class
+        pid_size = 1  # self.protocol_id
+        pf_size = 1  # self.priority_flag
+        sdt_size = len(self.schedule_delivery_time) + 1
+        dp_size = len(self.validity_period) + 1
+        rd_size = 1  # self.registered_delivery
+        ripf_size = 1  # self.replace_if_present_flag
+        dc_size = 1  # self.data_coding
+        sdmi_size = 1  # self.sm_default_msg_id
+        sl_size = 1  # self.sm_length
+        sm_size = len(self.short_message) + 1
+        return header_size +  st_size + sat_size + san_size + sa_size\
+                + dat_size + dan_size + da_size + ec_size\
+                + pid_size + pf_size + sdt_size + dp_size\
+                + rd_size + ripf_size + dc_size + sdmi_size\
+                + sl_size + sm_size
+
+    def pack(self) -> bytearray:
+        response = bytearray()
+        response += self._pack_header()
+        response += _pack_str(self.service_type, 6)
+        response += _pack_fmt("!BB", self.source_addr_ton,
+                              self.source_addr_npi)
+        response += _pack_str(self.source_addr, 21)
+        response += _pack_fmt("!BB", self.dest_addr_ton, self.dest_addr_npi)
+        response += _pack_str(self.destination_addr, 21)
+        response += _pack_fmt("!BBB", self.esm_class, self.protocol_id,
+                              self.priority_flag)
+        response += _pack_str(self.schedule_delivery_time, 17)
+        response += _pack_str(self.validity_period, 17)
+        response += _pack_fmt("!BBBB", self.registered_delivery,
+                              self.replace_if_present_flag, self.data_coding,
+                              self.sm_default_msg_id, self.sm_length)
+        response += _pack_str(self.short_message, 254)
+        return response
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -485,9 +565,9 @@ _COMMAND_CLASSES = {
     Command.UNBIND: Unbind,
     Command.UNBIND_RESP: UnbindResp,
     Command.GENERIC_NACK: GenericNack,
+    Command.SUBMIT_SM: SubmitSm,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
-    # SUBMIT_SM = 0x00000004
     # SUBMIT_SM_RESP = 0x80000004
     # DELIVER_SM = 0x00000005
     # DELIVER_SM_RESP = 0x80000005
