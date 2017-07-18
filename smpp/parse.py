@@ -986,6 +986,55 @@ class QuerySmResp(PDU):
         return bs
 
 
+class CancelSm(PDU):
+
+    command = Command.CANCEL_SM
+
+    def __init__(self):
+        super().__init__()
+        self.service_type = ""
+        self.message_id = ""
+        self.source_addr_ton = 0
+        self.source_addr_npi = 0
+        self.source_addr = ""
+        self.dest_addr_ton = 0
+        self.dest_addr_npi = 0
+        self.destination_addr = ""
+
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        st_size = len(self.service_type) + 1
+        mid_size = len(self.message_id) + 1
+        sat_size = 1  # self.source_addr_ton
+        san_size = 1  # self.source_addr_npi
+        sa_size = len(self.source_addr) + 1
+        dat_size = 1  # self.dest_addr_ton
+        dan_size = 1  # self.dest_addr_npi
+        da_size = len(self.destination_addr) + 1
+        return header_size + st_size\
+                + mid_size + sat_size\
+                + san_size + sa_size\
+                + dat_size + dan_size + da_size
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'CancelSm':
+        pdu = CancelSm()
+        bs = pdu._unpack_header(bs)
+        pdu.service_type, bs = unpack_coctet_string(bs)
+        pdu.message_id, bs = unpack_coctet_string(bs)
+        (sat, san), bs = _unpack_fmt("!BB", bs)
+        pdu.source_addr_ton = sat
+        pdu.source_addr_npi = san
+        pdu.source_addr, bs = unpack_coctet_string(bs)
+        (dat, dan), bs = _unpack_fmt("!BB", bs)
+        pdu.dest_addr_ton = dat
+        pdu.dest_addr_npi = dan
+        pdu.destination_addr, bs = unpack_coctet_string(bs)
+
+        return pdu
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -1008,6 +1057,7 @@ _COMMAND_CLASSES = {
     Command.DATA_SM_RESP: DataSmResp,
     Command.QUERY_SM: QuerySm,
     Command.QUERY_SM_RESP: QuerySmResp,
+    Command.CANCEL_SM: CancelSm,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
