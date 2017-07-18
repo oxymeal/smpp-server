@@ -760,6 +760,16 @@ class SubmitMultiResp(PDU):
         self.message_id = ""
         self.unsuccess_smses = []
 
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        mid_size = len(self.message_id) + 1
+        usmses_size = 0
+        for un_des in self.unsuccess_smses:
+            usmses_size += un_des.size
+        return header_size + mid_size\
+                + usmses_size
+
     def pack(self) -> bytearray:
         bs = self._pack_header(bs)
         bs += _pack_str(self.message_id, 65)
@@ -824,6 +834,12 @@ class DeliverSmResp(PDU):
         super().__init__()
         self.message_id = b'\x00'
 
+    @property
+    def command_length(self) -> int:
+        head_size = 16
+        zero_byte = 1
+        return head_size + zero_byte
+
     def pack(self) -> bytearray:
         bs = self._pack_header()
         bs += self.message_id
@@ -886,6 +902,12 @@ class DataSmResp(PDU):
     def __init__(self):
         super().__init__()
         self.message_id = ""
+
+    @property
+    def command_length(self):
+        head_size = 16
+        mid_size = len(self.message_id) + 1
+        return head_size + mid_size
 
     def pack(self) -> bytearray:
         bs = self._pack_header(bs)
