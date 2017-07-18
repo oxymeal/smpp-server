@@ -24,6 +24,9 @@ class Connection:
     def __repr__(self) -> str:
         return "Connection({})".format(self.mode)
 
+    def can_transmit(self) -> bool:
+        return self.mode in [Mode.TRANSMITTER, Mode.TRANSCEIVER]
+
 
 class BoundResponseSender:
     def __init__(self, server: 'Server', conn: Connection):
@@ -52,7 +55,7 @@ class Client:
         self.system_id = system_id
         self.password = password
         self.connections = set()
-        self._mdispatcher = messaging.Dispatcher(
+        self.mdispatcher = messaging.Dispatcher(
             self.system_id, self.password, None)
 
     def __repr__(self) -> str:
@@ -125,7 +128,18 @@ class Server:
             resp.sequence_number = pdu.sequence_number
             await brs.send(resp)
             return
-        raise NotImplementedError('not yet implemented for other commands')
+
+        if not brs.conn.can_transmit():
+            # TODO: Check the command.
+            # Some receiver responses must be allowed here.
+            nack = parse.GenericNack()
+            nack.sequence_number = pdu.sequence_number
+            # Invalid bind status
+            nack.command_status = parse.COMMAND_STATUS_ESME_RINVBNDSTS
+            await brs.send(nack)
+            return
+
+        await brs.conn.client.mdispatcher.receive(pdu, brs)
 
     async def _on_client_connected(self, conn: Connection):
         brs = BoundResponseSender(self, conn)
