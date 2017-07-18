@@ -49,10 +49,11 @@ class Dispatcher:
     делать вызывающий код.
     """
 
-    def __init__(self, system_id: str, d: Deliverer):
+    def __init__(self, system_id: str, password: str, d: Deliverer):
         # system_id - идентификатор пользователя.
-        self._system_id = system_id
-        self._d = d
+        self.system_id = system_id
+        self.password = password
+        self.d = d
 
     async def receive(self, pdu: parse.PDU, rs: ResponseSender):
         """

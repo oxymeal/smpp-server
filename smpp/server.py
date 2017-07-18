@@ -40,10 +40,12 @@ class BoundResponseSender:
 
 
 class Client:
-    def __init__(self, system_id: str):
+    def __init__(self, system_id: str, password: str):
         self.system_id = system_id
+        self.password = password
         self.connections = set()
-        self._mdispatcher = messaging.Dispatcher(self.system_id, None)
+        self._mdispatcher = messaging.Dispatcher(
+            self.system_id, self.password, None)
 
     def __repr__(self) -> str:
         return "Client('{}', {})".format(self.system_id, self.connections)
@@ -57,13 +59,13 @@ class Server:
         # Maps system_ids to client objects.
         self._clients = {} # type: Dict[str, Client]
 
-    def _bind(self, conn: Connection, m: Mode, sid: str):
+    def _bind(self, conn: Connection, m: Mode, sid: str, pwd: str):
         self._unbind(conn)
 
         conn.mode = m
 
         if sid not in self._clients:
-            self._clients[sid] = Client(sid)
+            self._clients[sid] = Client(sid, pwd)
 
         self._clients[sid].connections.add(conn)
 
@@ -88,21 +90,21 @@ class Server:
             await brs.send(resp)
             return
         elif pdu.command == parse.Command.BIND_RECEIVER:
-            self._bind(brs.conn, Mode.RECEIVER, pdu.system_id)
+            self._bind(brs.conn, Mode.RECEIVER, pdu.system_id, pdu.password)
             resp = parse.BindReceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
             await brs.send(resp)
             return
         elif pdu.command == parse.Command.BIND_TRANSMITTER:
-            self._bind(brs.conn, Mode.TRANSMITTER, pdu.system_id)
+            self._bind(brs.conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
             resp = parse.BindTransmitterResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
             await brs.send(resp)
             return
         elif pdu.command == parse.Command.BIND_TRANSCEIVER:
-            self._bind(brs.conn, Mode.TRANSCEIVER, pdu.system_id)
+            self._bind(brs.conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
             resp = parse.BindTransceiverResp()
             resp.sequence_number = pdu.sequence_number
             resp.system_id = pdu.system_id
