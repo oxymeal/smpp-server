@@ -608,6 +608,115 @@ class SubmitSmResp(PDU):
         return response
 
 
+class Dest:
+    def __init__(self):
+        self.dest_addr_ton = 0
+        self.dest_addr_npi = 0
+        self.destination_addr = ""
+
+    @property
+    def size(self) -> int:
+        dat_size = 1
+        dan_size = 1
+        da_size = len(self.destination_addr) + 1
+        return dat_size + dan_size + da_size
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> Tuple['Dest', bytearray]:
+        dest = Dest()
+        (dat, dan), bs = _unpack_fmt('!BB', bs)
+        dest.dest_addr_npi = dat
+        dest.dest_addr_ton = dan
+        dest.destination_addr, bs = _unpack_octet_string(bs)
+        return dest, bs
+
+
+class SubmitMulti(PDU):
+
+    command = Command.SUBMIT_MULTI
+
+    def __init__(self):
+        self.service_type = ""
+        self.source_addr_ton = 0
+        self.source_addr_npi = 0
+        self.source_addr = ""
+        self.number_of_dests = 0
+        self.dest_address_es = []
+        self.esm_class = 0
+        self.protocol_id = 0
+        self.priority_flag = 0
+        self.schedule_delivery_time = ""
+        self.validity_period = ""
+        self.registered_delivery = 0
+        self.replace_if_present_flag = 0
+        self.data_coding = 0
+        self.sm_default_msg_id = 0
+        self.sm_length = 0
+        self.short_message = ""
+
+    @property
+    def command_length(self) -> int:
+        header_size = 16
+        st_size = len(self.service_type) + 1
+        sat_size = 1  # self.source_addr_ton
+        san_size = 1  # self.source_addr_npi
+        sa_size = len(self.source_addr) + 1
+        nod_size = 1  # self.number_of_dests
+        dae_size = 0
+        for dest in self.dest_address_es:
+            dae_size += dest.size
+        da_size = len(self.destination_addr) + 1
+        ec_size = 1  # self.esm_class
+        pid_size = 1  # self.protocol_id
+        pf_size = 1  # self.priority_flag
+        sdt_size = len(self.schedule_delivery_time) + 1
+        dp_size = len(self.validity_period) + 1
+        rd_size = 1  # self.registered_delivery
+        ripf_size = 1  # self.replace_if_present_flag
+        dc_size = 1  # self.data_coding
+        sdmi_size = 1  # self.sm_default_msg_id
+        sl_size = 1  # self.sm_length
+        sm_size = len(self.short_message) + 1
+        return header_size +  st_size + sat_size + san_size + sa_size\
+                + nod_size + dae_size + da_size + ec_size\
+                + pid_size + pf_size + sdt_size + dp_size\
+                + rd_size + ripf_size + dc_size + sdmi_size\
+                + sl_size + sm_size
+
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'SubmitMulti':
+        pdu = SubmitMulti()
+
+        bs = pdu._unpack_header(bs)
+        pdu.service_type, bs = unpack_coctet_string(bs)
+        (sdt, anp), bs = _unpack_fmt('!BB', bs)
+        pdu.source_addr_ton = sdt
+        pdu.source_addr_npi = anp
+        pdu.source_addr, bs = unpack_coctet_string(bs)
+        pdu.number_of_dests, bs = _unpack_fmt('!B', bs)
+
+        d = Dest()
+        for dest in range(0, pdu.number_of_dests):
+            dest_addr, bs = d.unpack(bs)
+            pdu.dest_address_es.append(dest_addr)
+
+        (ec, pid, pf), bs = _unpack_fmt('!BBB', bs)
+        pdu.esm_class = ec
+        pdu.protocol_id = pid
+        pdu.priority_flag = pf
+        pdu.schedule_delivery_time, bs = unpack_coctet_string(bs)
+        pdu.validity_period, bs = unpack_coctet_string(bs)
+        (rd, ripf, dc, smdi, sl), bs = _unpack_fmt('!BBBBB', bs)
+        pdu.registered_delivery = rd
+        pdu.replace_if_present_flag = ripf
+        pdu.data_coding = dc
+        pdu.sm_default_msg_id = smdi
+        pdu.sm_length = sl
+        pdu.short_message, _ = _unpack_octet_string(bs, pdu.sm_length)
+
+        return pdu
+
+
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
     Command.BIND_RECEIVER_RESP: BindReceiverResp,
@@ -622,6 +731,7 @@ _COMMAND_CLASSES = {
     Command.GENERIC_NACK: GenericNack,
     Command.SUBMIT_SM: SubmitSm,
     Command.SUBMIT_SM_RESP: SubmitSmResp,
+    Command.SUBMIT_MULTI: SubmitMulti,
     # QUERY_SM = 0x00000003
     # QUERY_SM_RESP = 0x80000003
     # DELIVER_SM = 0x00000005
