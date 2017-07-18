@@ -2,6 +2,7 @@ import asyncio
 import struct
 from collections import defaultdict
 from enum import Enum
+from typing import Iterator, Tuple
 
 from . import parse, messaging
 
@@ -41,8 +42,16 @@ class Connection:
         self.w.write(pdu_bytes)
         await self.w.drain()
 
+    async def send_to_rcv(self, pdu: parse.PDU):
+        recvs = self.server.get_receivers(self.client.system_id)
+        tasks = [c.send(pdu) for c in recvs]
+        await asyncio.gather(*tasks)
+
     def can_transmit(self) -> bool:
         return self.mode in [Mode.TRANSMITTER, Mode.TRANSCEIVER]
+
+    def can_receive(self) -> bool:
+        return self.mode in [Mode.RECEIVER, Mode.TRANSCEIVER]
 
 
 class Client:
@@ -89,6 +98,14 @@ class Server:
 
         for sid in remove_sids:
             del self._clients[sid]
+
+    def get_receivers(self, sid: str) -> Iterator[Connection]:
+        if sid not in self._clients:
+            return
+
+        for conn in self._clients[sid].connections:
+            if conn.can_receive():
+                yield conn
 
     async def _dispatch_pdu(self, conn: Connection, pdu: parse.PDU):
         if pdu.command == parse.Command.ENQUIRE_LINK:
