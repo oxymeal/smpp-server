@@ -25,9 +25,9 @@ class Connection:
 
 
 class BoundResponseSender:
-    def __init__(self, s: 'Server', c: Connection):
-        self._s = s
-        self._c = c
+    def __init__(self, server: 'Server', conn: Connection):
+        self.server = server
+        self.conn = conn
 
     async def send(self, pdu: parse.PDU):
         try:
@@ -36,8 +36,8 @@ class BoundResponseSender:
             # TODO: Return g-back
             raise
 
-        self._c.w.write(pdu_bytes)
-        await self._c.w.drain()
+        self.conn.w.write(pdu_bytes)
+        await self.conn.w.drain()
 
 
 class Server:
@@ -74,7 +74,33 @@ class Server:
             resp.sequence_number = pdu.sequence_number
             await brs.send(resp)
             return
-
+        elif pdu.command == parse.Command.BIND_RECEIVER:
+            self._bind(brs.conn, Mode.RECEIVER, pdu.system_id)
+            resp = parse.BindReceiverResp()
+            resp.sequence_number = pdu.sequence_number
+            resp.system_id = pdu.system_id
+            await brs.send(resp)
+            return
+        elif pdu.command == parse.Command.BIND_TRANSMITTER:
+            self._bind(brs.conn, Mode.TRANSMITTER, pdu.system_id)
+            resp = parse.BindTransmitterResp()
+            resp.sequence_number = pdu.sequence_number
+            resp.system_id = pdu.system_id
+            await brs.send(resp)
+            return
+        elif pdu.command == parse.Command.BIND_TRANSCEIVER:
+            self._bind(brs.conn, Mode.TRANSCEIVER, pdu.system_id)
+            resp = parse.BindTransceiverResp()
+            resp.sequence_number = pdu.sequence_number
+            resp.system_id = pdu.system_id
+            await brs.send(resp)
+            return
+        elif pdu.command == parse.Command.UNBIND:
+            self._unbind(brs.conn)
+            resp = parse.UnbindResp()
+            resp.sequence_number = pdu.sequence_number
+            await brs.send(resp)
+            return
         raise NotImplementedError('not yet implemented for other commands')
 
     async def _on_client_connected(self, conn: Connection):
