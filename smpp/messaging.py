@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from . import parse
+from . import external, parse
 
 
 logger = logging.getLogger(__name__)
@@ -29,17 +29,6 @@ class ResponseSender:
         raise NotImplementedError('send')
 
 
-class Deliverer:
-    """
-    Этот класс используется как интерфейс к внешнему доставщику сообщений.
-    """
-
-    # Аргументы метода надо будет дописать по мере наобходимости.
-    # Возможно, стоит создать структуру для передачи всех необходимых данных.
-    def deliver(self, *args):
-        raise NotImplementedError('deliver')
-
-
 class Dispatcher:
     """
     Класс обработки команд соединения в режиме Transmitter.
@@ -53,11 +42,11 @@ class Dispatcher:
     делать вызывающий код.
     """
 
-    def __init__(self, system_id: str, password: str, d: Deliverer):
+    def __init__(self, system_id: str, password: str, eprovider: external.Provider):
         # system_id - идентификатор пользователя.
         self.system_id = system_id
         self.password = password
-        self.d = d
+        self.eprovider = eprovider
 
     async def receive(self, pdu: parse.PDU, rs: ResponseSender):
         """

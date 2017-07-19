@@ -5,7 +5,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Iterator, Optional, Tuple
 
-from . import parse, messaging
+from . import external, parse, messaging
 
 
 logger = logging.getLogger(__name__)
@@ -79,21 +79,22 @@ class Connection:
 
 
 class Client:
-    def __init__(self, system_id: str, password: str):
+    def __init__(self, system_id: str, password: str, provider: external.Provider):
         self.system_id = system_id
         self.password = password
         self.connections = set()
         self.mdispatcher = messaging.Dispatcher(
-            self.system_id, self.password, None)
+            self.system_id, self.password, provider)
 
     def __repr__(self) -> str:
         return "Client('{}', {})".format(self.system_id, self.connections)
 
 
 class Server:
-    def __init__(self, host='0.0.0.0', port=2775):
+    def __init__(self, host='0.0.0.0', port=2775, provider: external.Provider = None):
         self.host = host
         self.port = port
+        self.provider = provider
 
         # Maps system_ids to client objects.
         self._clients = {} # type: Dict[str, Client]
@@ -102,7 +103,7 @@ class Server:
         self._unbind(conn)
 
         if sid not in self._clients:
-            self._clients[sid] = Client(sid, pwd)
+            self._clients[sid] = Client(sid, pwd, self.provider)
 
         self._clients[sid].connections.add(conn)
         conn.mode = m
