@@ -8,6 +8,10 @@ from smpp.vendor.smpplib.smpp import make_pdu
 from smpp.server import Server
 
 
+import logging
+logging.basicConfig(level=logging.CRITICAL)
+
+
 TEST_SERVER_PORT = 2775
 
 
