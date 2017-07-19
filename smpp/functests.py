@@ -6,9 +6,12 @@ from smpp.vendor.smpplib.smpp import make_pdu
 from smpp.server import Server
 
 
+TEST_SERVER_PORT = 2775
+
+
 class EnquireLinkTestCase(unittest.TestCase):
     def setUp(self):
-        self.server = Server()
+        self.server = Server(port=TEST_SERVER_PORT)
         self.sproc = multiprocessing.Process(target=self.server.run)
         self.sproc.start()
         import time
@@ -18,7 +21,7 @@ class EnquireLinkTestCase(unittest.TestCase):
         self.sproc.terminate()
 
     def test_enquire_link_resp(self):
-        client = Client('localhost', 2775)
+        client = Client('localhost', TEST_SERVER_PORT)
         client.connect()
 
         command = make_pdu('enquire_link', client=client)
