@@ -1,4 +1,6 @@
 import logging
+import uuid
+from datetime import datetime
 from typing import Optional
 
 from . import external, parse
@@ -61,6 +63,72 @@ class Dispatcher:
         либо в соединения в режиме receiver.
         """
         logger.info('Dispatching PDU {}'.format(pdu.command))
+
+
+        if pdu.command == parse.Command.SUBMIT_SM:
+            sm = external.ShortMessage(
+                self.system_id, self.password,
+                pdu.source_addr_ton, pdu.source_addr_npi, source_addr,
+                dest_addr_ton, dest_addr_npi, destination_addr,
+                body
+            )
+
+            if pdu.esm_class == parse.STORE_AND_FORWARD: #Store and forward
+
+                message_id = str(uuid.uuid4())[:8]
+
+                submit_sm_resp = parse.SubmitSmResp()
+                submit_sm_resp.message_id = message_id
+                submit_sm_resp.sequence_number = pdu.sequence_number
+
+                await rs.send(submit_sm_resp)
+
+                #TODO:
+                # CREATE FUNC FOR THIS TIME WORKAROUND
+
+                time_offset = pdu.validity_period[13:15]
+                time_offset_sign = pdu.validity_period[-1]
+
+                time_offset_in_minutes = int(time_offset) * 15
+                time_offset_hours = time_offset_in_minutes // 60
+                time_offset_minutes = time_offset_in_minutes - time_offset_hours * 60
+
+                time_offset_hours_formatted = str(time_offset_hours).rjust(2, "0")
+                time_offset_minutes_formatted = str(time_offset_minutes).rjust(2, "0")
+                time_offset_formatted = "".join([time_offset_sign, time_offset_hours_formatted, time_offset_minutes_formatted])
+
+                validity_period_formatted = pdu.validity_period[:12] + time_offset_formatted
+
+                sm_validity_period = datetime.strptime(validity_period_formatted, "%y%m%d%H%M%S%z")
+
+                status = ""
+                while True:
+                    sm_status = eprovider.deliver(sm)
+
+                    if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
+                        status = sm_status
+                        break
+
+                if status == external.DeliveryStatus.OK and pdu.registered_delivery == 1:
+
+                    deliver_sm = parse.DeliverSm()
+                    deliver_sm.service_type = pdu.service_type
+                    deliver_sm.source_addr_ton = pdu.source_addr_ton
+                    deliver_sm.source_addr_npi = pdu.source_addr_npi
+                    deliver_sm.source_addr = pdu.source_addr
+                    deliver_sm.dest_addr_ton = pdu.dest_addr_ton
+                    deliver_sm.dest_addr_npi = pdu.dest_addr_npi
+                    deliver.destination_addr = pdu.destination_addr
+                    deliver_sm.sequence_number = pdu.sequence_number
+
+                    await rs.send_to_rcv(deliver_sm)
+
+                return
+
+            elif pdu.esm_class in parse.DATAGRAMM: #Dategramm
+                return
+            elif pdu.esm_class == parse.TRANSACTION: #Transaction
+                return
 
         nack = parse.GenericNack()
         nack.sequence_number = pdu.sequence_number
