@@ -222,7 +222,7 @@ def unpack_coctet_string(bs: bytearray) -> Tuple[str, bytearray]:
 
 
 def _pack_str(input_str: str, max_size: int) -> bytearray:
-    input_str = st.encode('ascii')
+    input_str = input_str.encode('ascii')
     input_str += b'\x00'
     if len(input_str) > max_size:
         raise PackingError("Field size too long")
