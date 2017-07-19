@@ -1,3 +1,5 @@
+import time
+import socket
 import unittest
 import multiprocessing
 
@@ -9,13 +11,26 @@ from smpp.server import Server
 TEST_SERVER_PORT = 2775
 
 
+def start_server_proc():
+    server = Server(port=TEST_SERVER_PORT)
+    sproc = multiprocessing.Process(target=server.run)
+    sproc.start()
+
+    # Wait for port to opet
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        res = s.connect_ex(('localhost', TEST_SERVER_PORT))
+        if res == 0:
+            s.close()
+            break
+
+        time.sleep(0.1)
+
+    return sproc
+
 class EnquireLinkTestCase(unittest.TestCase):
     def setUp(self):
-        self.server = Server(port=TEST_SERVER_PORT)
-        self.sproc = multiprocessing.Process(target=self.server.run)
-        self.sproc.start()
-        import time
-        time.sleep(1)
+        self.sproc = start_server_proc()
 
     def tearDown(self):
         self.sproc.terminate()
