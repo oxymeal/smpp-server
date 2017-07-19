@@ -6,10 +6,6 @@ from smpp.vendor.smpplib.smpp import make_pdu
 from smpp.server import Server
 
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-
 class EnquireLinkTestCase(unittest.TestCase):
     def setUp(self):
         self.server = Server()
