@@ -234,6 +234,7 @@ class Server:
             conn = Connection(self, r, w)
             await self._on_client_connected(conn)
 
+        logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
         await asyncio.start_server(conncb, self.host, self.port)
 
     def run(self):
