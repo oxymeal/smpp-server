@@ -7,6 +7,7 @@ from smpp.vendor.smpplib import consts
 from smpp.vendor.smpplib.client import Client
 from smpp.vendor.smpplib.smpp import make_pdu
 from smpp.server import Server
+from timeout_decorator import timeout
 
 
 import logging
@@ -33,6 +34,7 @@ def start_server_proc():
 
     return sproc
 
+
 class EnquireLinkTestCase(unittest.TestCase):
     def setUp(self):
         self.sproc = start_server_proc()
@@ -52,6 +54,7 @@ class EnquireLinkTestCase(unittest.TestCase):
         self.assertEqual(resp.sequence, command.sequence)
 
         client.disconnect()
+
 
 class BindStatusCheckingTestCase(unittest.TestCase):
     def setUp(self):
@@ -90,3 +93,41 @@ class BindStatusCheckingTestCase(unittest.TestCase):
         self.assertEqual(resp.command, 'generic_nack')
         self.assertEqual(resp.sequence, cmd.sequence)
         self.assertEqual(resp.status, consts.SMPP_ESME_RINVBNDSTS)
+
+
+class AsyncDispatchTestCase(unittest.TestCase):
+    def setUp(self):
+        self.sproc = start_server_proc()
+
+    def tearDown(self):
+        self.sproc.terminate()
+
+    @timeout(seconds=1)
+    def test_async_eqlinks(self):
+        c1 = Client('localhost', TEST_SERVER_PORT)
+        c1.connect()
+        cmd1 = make_pdu('enquire_link', client=c1)
+        cmd1.sequence = 1
+        c1.send_pdu(cmd1)
+
+        c2 = Client('localhost', TEST_SERVER_PORT)
+        c2.connect()
+        cmd2 = make_pdu('enquire_link', client=c2)
+        cmd2.sequence = 2
+        c2.send_pdu(cmd2)
+
+        c3 = Client('localhost', TEST_SERVER_PORT)
+        c3.connect()
+        cmd3 = make_pdu('enquire_link', client=c3)
+        cmd3.sequence = 3
+        c3.send_pdu(cmd3)
+
+        # Should not block
+        resp3 = c3.read_pdu()
+        resp1 = c1.read_pdu()
+        resp2 = c2.read_pdu()
+
+        # Should dispatch correctly
+        self.assertEqual(resp1.sequence, 1)
+        self.assertEqual(resp2.sequence, 2)
+        self.assertEqual(resp3.sequence, 3)
