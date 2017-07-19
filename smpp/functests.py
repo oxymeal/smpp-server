@@ -24,7 +24,6 @@ class EnquireLinkTestCase(unittest.TestCase):
     def test_enquire_link_resp(self):
         client = Client('localhost', 2775)
         client.connect()
-        client.bind_transmitter()
 
         command = make_pdu('enquire_link', client=client)
         client.send_pdu(command)

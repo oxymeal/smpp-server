@@ -164,10 +164,6 @@ class Client(object):
     def send_pdu(self, p):
         """Send PDU to the SMSC"""
 
-        if not self.state in consts.COMMAND_STATES[p.command]:
-            raise exceptions.PDUError("Command %s failed: %s" %
-                (p.command, consts.DESCRIPTIONS[consts.SMPP_ESME_RINVBNDSTS]))
-
         logger.debug('Sending %s PDU', p.command)
 
         generated = p.generate()
