@@ -5,6 +5,7 @@ import multiprocessing
 
 from smpp.vendor.smpplib import consts
 from smpp.vendor.smpplib.client import Client
+from smpp.vendor.smpplib.exceptions import PDUError
 from smpp.vendor.smpplib.smpp import make_pdu
 from smpp.server import Server
 from timeout_decorator import timeout
@@ -17,8 +18,8 @@ logging.basicConfig(level=logging.CRITICAL)
 TEST_SERVER_PORT = 2775
 
 
-def start_server_proc():
-    server = Server(port=TEST_SERVER_PORT)
+def start_server_proc(**kwargs):
+    server = Server(port=TEST_SERVER_PORT, **kwargs)
     sproc = multiprocessing.Process(target=server.run)
     sproc.start()
 
@@ -131,3 +132,51 @@ class AsyncDispatchTestCase(unittest.TestCase):
         self.assertEqual(resp1.sequence, 1)
         self.assertEqual(resp2.sequence, 2)
         self.assertEqual(resp3.sequence, 3)
+
+
+class BindAuthTestCase(unittest.TestCase):
+    class DummyProvider:
+        def __init__(self, csid: str, cpwd: str):
+            self.csid = csid
+            self.cpwd = cpwd
+
+        def authenticate(self, system_id: str, password: str) -> bool:
+            return self.csid == system_id and self.cpwd == password
+
+
+    CORRECT_SID = "user"
+    CORRECT_PWD = "mypwd"
+    INCORRECT_SID = "user2"
+    INCORRECT_PWD = "mypwd2"
+
+
+    def setUp(self):
+        self.sproc = start_server_proc(
+            provider=self.DummyProvider(self.CORRECT_SID, self.CORRECT_PWD))
+
+    def tearDown(self):
+        self.sproc.terminate()
+
+    def test_auth_bind(self):
+        client = Client('localhost', TEST_SERVER_PORT)
+        client.connect()
+
+        # Should not raise
+        client.bind_transmitter(
+            system_id=self.CORRECT_SID, password=self.CORRECT_PWD)
+
+    def test_unauth_bind(self):
+        client = Client('localhost', TEST_SERVER_PORT)
+        client.connect()
+
+        with self.assertRaises(PDUError):
+            client.bind_transmitter(
+                system_id=self.INCORRECT_SID, password=self.CORRECT_PWD)
+
+        with self.assertRaises(PDUError):
+            client.bind_transmitter(
+                system_id=self.CORRECT_SID, password=self.INCORRECT_PWD)
+
+        with self.assertRaises(PDUError):
+            client.bind_transmitter(
+                system_id=self.INCORRECT_SID, password=self.INCORRECT_PWD)

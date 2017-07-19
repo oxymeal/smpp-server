@@ -132,6 +132,36 @@ class Server:
             if conn.can_receive():
                 yield conn
 
+    def do_bind(self, conn: Connection, pdu: parse.PDU) -> parse.PDU:
+        if pdu.command == parse.Command.BIND_RECEIVER:
+            resp = parse.BindReceiverResp()
+        elif pdu.command == parse.Command.BIND_TRANSMITTER:
+            resp = parse.BindTransmitterResp()
+        elif pdu.command == parse.Command.BIND_TRANSCEIVER:
+            resp = parse.BindTransceiverResp()
+
+        resp.sequence_number = pdu.sequence_number
+        resp.system_id = pdu.system_id
+
+        if self.provider:
+            logger.debug('Using provider to authenticate user')
+            is_auth = self.provider.authenticate(pdu.system_id, pdu.password)
+            if not is_auth:
+                logger.error('Failed to authenticate {} at {}'.format(pdu.system_id, conn.peer))
+                resp.command_status = parse.COMMAND_STATUS_ESME_RINVPASWD
+                return resp
+
+        if pdu.command == parse.Command.BIND_RECEIVER:
+            self._bind(conn, Mode.RECEIVER, pdu.system_id, pdu.password)
+        elif pdu.command == parse.Command.BIND_TRANSMITTER:
+            self._bind(conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
+        elif pdu.command == parse.Command.BIND_TRANSCEIVER:
+            self._bind(conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
+
+        logger.info('Bound {} at {} as {}'.format(conn.system_id, conn.peer, conn.mode))
+
+        return resp
+
     async def _dispatch_pdu(self, conn: Connection, pdu: parse.PDU):
         logger.info('PDU {} from {}'.format(pdu.command, conn.peer))
 
@@ -140,28 +170,10 @@ class Server:
             resp.sequence_number = pdu.sequence_number
             await conn.send(resp)
             return
-        elif pdu.command == parse.Command.BIND_RECEIVER:
-            self._bind(conn, Mode.RECEIVER, pdu.system_id, pdu.password)
-            logger.info('Bound {} at {} as RECEIVER'.format(conn.system_id, conn.peer))
-            resp = parse.BindReceiverResp()
-            resp.sequence_number = pdu.sequence_number
-            resp.system_id = pdu.system_id
-            await conn.send(resp)
-            return
-        elif pdu.command == parse.Command.BIND_TRANSMITTER:
-            self._bind(conn, Mode.TRANSMITTER, pdu.system_id, pdu.password)
-            logger.info('Bound {} at {} as TRANSMITTER'.format(conn.system_id, conn.peer))
-            resp = parse.BindTransmitterResp()
-            resp.sequence_number = pdu.sequence_number
-            resp.system_id = pdu.system_id
-            await conn.send(resp)
-            return
-        elif pdu.command == parse.Command.BIND_TRANSCEIVER:
-            self._bind(conn, Mode.TRANSCEIVER, pdu.system_id, pdu.password)
-            logger.info('Bound {} at {} as TRANSCEIVER'.format(conn.system_id, conn.peer))
-            resp = parse.BindTransceiverResp()
-            resp.sequence_number = pdu.sequence_number
-            resp.system_id = pdu.system_id
+        elif pdu.command in [parse.Command.BIND_RECEIVER,
+                             parse.Command.BIND_TRANSMITTER,
+                             parse.Command.BIND_TRANSCEIVER]:
+            resp = self.do_bind(conn, pdu)
             await conn.send(resp)
             return
         elif pdu.command == parse.Command.UNBIND:
