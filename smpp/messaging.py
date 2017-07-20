@@ -122,6 +122,7 @@ class Dispatcher:
                     deliver_sm.dest_addr_npi = pdu.dest_addr_npi
                     deliver_sm.destination_addr = pdu.destination_addr
                     deliver_sm.sequence_number = pdu.sequence_number
+                    deliver_sm.short_message = pdu.short_message
 
                     await rs.send_to_rcv(deliver_sm)
 
