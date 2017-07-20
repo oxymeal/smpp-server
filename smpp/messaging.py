@@ -68,7 +68,7 @@ class Dispatcher:
         logger.info('Dispatching PDU {}'.format(pdu.command))
 
         if pdu.command == parse.Command.SUBMIT_SM:
-            sm = external.base.ShortMessage(
+            sm = external.ShortMessage(
                 system_id=self.system_id, password=self.password,
                 source_addr_ton=pdu.source_addr_ton, source_addr_npi=pdu.source_addr_npi, source_addr=pdu.source_addr,
                 dest_addr_ton=pdu.dest_addr_ton, dest_addr_npi=pdu.dest_addr_npi, destination_addr=pdu.destination_addr,
@@ -107,11 +107,11 @@ class Dispatcher:
                 while True:
                     sm_status = self.eprovider.deliver(sm)
 
-                    if sm_status == external.base.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
+                    if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
                         status = sm_status
                         break
 
-                if status == external.base.DeliveryStatus.OK and pdu.registered_delivery == 1:
+                if status == external.DeliveryStatus.OK and pdu.registered_delivery == 1:
 
                     deliver_sm = parse.DeliverSm()
                     deliver_sm.service_type = pdu.service_type
