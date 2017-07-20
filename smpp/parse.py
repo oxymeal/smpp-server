@@ -774,7 +774,7 @@ class SubmitMultiResp(PDU):
                 + usmses_size
 
     def pack(self) -> bytearray:
-        bs = self._pack_header(bs)
+        bs = self._pack_header()
         bs += _pack_str(self.message_id, 65)
         bs += _pack_fmt("!B", len(self.unsuccess_smses))
 
