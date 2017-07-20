@@ -66,7 +66,7 @@ class Dispatcher:
 
 
         if pdu.command == parse.Command.SUBMIT_SM:
-            sm = external.ShortMessage(
+            sm = external.base.ShortMessage(
                 self.system_id, self.password,
                 pdu.source_addr_ton, pdu.source_addr_npi, source_addr,
                 dest_addr_ton, dest_addr_npi, destination_addr,
