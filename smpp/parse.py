@@ -797,6 +797,16 @@ class DeliverSm(PDU):
         self.dest_addr_ton = 0
         self.dest_addr_npi = 0
         self.destination_addr = ""
+        self.esm_class = 0
+        self.protocol_id = 0
+        self.priority_flag = 0
+        self.schedule_delivery_time = b'\x00'
+        self.validity_period = b'\x00'
+        self.registered_delivery = 0
+        self.replace_if_present_flag = 0
+        self.data_coding = 0
+        self.sm_default_msg_id = 0
+        self.short_message = ""
 
     @property
     def command_length(self) -> int:
@@ -808,8 +818,22 @@ class DeliverSm(PDU):
         dat_size = 1
         dan_size = 1
         da_size = len(self.destination_addr) + 1
+        ec_size = 1
+        pid_size = 1
+        pf_size = 1
+        sdt_size = 1
+        vp_size = 1
+        rd_size = 1
+        ripf_size = 1
+        dc_size = 1
+        smdid_size = 1
+        sms_size = 1
+        sm_size = len(self.short_message) + 1
         return head_size + st_size + sat_size + san_size\
-                 + sad_size + dat_size + dan_size + da_size
+                 + sad_size + dat_size + dan_size + da_size\
+                 + ec_size + pid_size + pf_size + sdt_size\
+                 + vp_size + rd_size + ripf_size + dc_size\
+                 + smdid_size + sms_size + sm_size
 
     def pack(self) -> bytearray:
         bs = self._pack_header()
@@ -818,24 +842,13 @@ class DeliverSm(PDU):
         bs += _pack_str(self.source_addr, 21)
         bs += _pack_fmt('!BB', self.dest_addr_ton, self.dest_addr_npi)
         bs += _pack_str(self.destination_addr, 21)
+        bs += _pack_fmt('!BBB', self.esm_class, self.protocol_id, self.priority_flag)
+        bs += b'\x00\x00' # schedule_delivery_time and validity_period
+        bs += _pack_fmt('!BBBB', self.registered_delivery, self.replace_if_present_flag,
+                        self.data_coding, self.sm_default_msg_id)
+        bs += _pack_fmt('!B', len(self.short_message))
+        bs += self.short_message.encode('ascii')
         return bs
-
-    @classmethod
-    def unpack(cls, bs: bytearray) -> 'DeliverSm':
-        pdu = DeliverSm()
-
-        pdu._unpack_header()
-        pdu.service_type, bs = unpack_coctet_string(bs)
-        (sat, san), bs = _unpack_fmt('!BB', bs)
-        pdu.source_addr_ton = sat
-        pdu.source_addr_npi = san
-        pdu.source_addr, bs = unpack_coctet_string(bs)
-        (dat, dan), bs = _unpack_fmt('!BB', bs)
-        pdu.dest_addr_ton = dat
-        pdu.dest_addr_npi = dan
-        pdu.destination_addr, _ = unpack_coctet_string(bs)
-
-        return pdu
 
 
 class DeliverSmResp(PDU):
