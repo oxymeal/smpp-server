@@ -811,6 +811,15 @@ class DeliverSm(PDU):
         return head_size + st_size + sat_size + san_size\
                  + sad_size + dat_size + dan_size + da_size
 
+    def pack(self) -> bytearray:
+        bs = self._pack_header()
+        bs += _pack_str(self.service_type, 6)
+        bs += _pack_fmt('!BB', self.source_addr_ton, self.source_addr_npi)
+        bs += _pack_str(self.source_addr, 21)
+        bs += _pack_fmt('!BB', self.dest_addr_ton, self.dest_addr_npi)
+        bs += _pack_str(self.destination_addr, 21)
+        return bs
+
     @classmethod
     def unpack(cls, bs: bytearray) -> 'DeliverSm':
         pdu = DeliverSm()
