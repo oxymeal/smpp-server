@@ -1,13 +1,14 @@
 import time
 import socket
 import unittest
-import multiprocessing
+import threading
 
+from smpp import external
+from smpp.server import Server
 from smpp.vendor.smpplib import consts
 from smpp.vendor.smpplib.client import Client
 from smpp.vendor.smpplib.exceptions import PDUError
 from smpp.vendor.smpplib.smpp import make_pdu
-from smpp.server import Server
 from timeout_decorator import timeout
 
 
@@ -18,9 +19,9 @@ logging.basicConfig(level=logging.CRITICAL)
 TEST_SERVER_PORT = 2775
 
 
-def start_server_proc(**kwargs):
+def start_server_thread(**kwargs):
     server = Server(port=TEST_SERVER_PORT, **kwargs)
-    sproc = multiprocessing.Process(target=server.run)
+    sproc = threading.Thread(target=server.run)
     sproc.start()
 
     # Wait for port to opet
@@ -33,15 +34,16 @@ def start_server_proc(**kwargs):
 
         time.sleep(0.1)
 
-    return sproc
+    return server, sproc
 
 
 class EnquireLinkTestCase(unittest.TestCase):
     def setUp(self):
-        self.sproc = start_server_proc()
+        self.server, self.sthread = start_server_thread()
 
     def tearDown(self):
-        self.sproc.terminate()
+        self.server.stop()
+        self.sthread.join()
 
     def test_enquire_link_resp(self):
         client = Client('localhost', TEST_SERVER_PORT)
@@ -59,10 +61,11 @@ class EnquireLinkTestCase(unittest.TestCase):
 
 class BindStatusCheckingTestCase(unittest.TestCase):
     def setUp(self):
-        self.sproc = start_server_proc()
+        self.server, self.sthread = start_server_thread()
 
     def tearDown(self):
-        self.sproc.terminate()
+        self.server.stop()
+        self.sthread.join()
 
     def test_nobind_nack(self):
         client = Client('localhost', TEST_SERVER_PORT)
@@ -98,10 +101,11 @@ class BindStatusCheckingTestCase(unittest.TestCase):
 
 class AsyncDispatchTestCase(unittest.TestCase):
     def setUp(self):
-        self.sproc = start_server_proc()
+        self.server, self.sthread = start_server_thread()
 
     def tearDown(self):
-        self.sproc.terminate()
+        self.server.stop()
+        self.sthread.join()
 
     @timeout(seconds=1)
     def test_async_eqlinks(self):
@@ -151,11 +155,12 @@ class BindAuthTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.sproc = start_server_proc(
+        self.server, self.sthread = start_server_thread(
             provider=self.DummyProvider(self.CORRECT_SID, self.CORRECT_PWD))
 
     def tearDown(self):
-        self.sproc.terminate()
+        self.server.stop()
+        self.sthread.join()
 
     def test_auth_bind(self):
         client = Client('localhost', TEST_SERVER_PORT)

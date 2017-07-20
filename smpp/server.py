@@ -58,7 +58,7 @@ class Connection:
 
         recvs = self.server.get_receivers(self.system_id)
         tasks = [c.send(pdu) for c in recvs]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, loop=self.client.server.loop)
 
     @property
     def peer(self) -> Tuple[str, int]:
@@ -79,9 +79,10 @@ class Connection:
 
 
 class Client:
-    def __init__(self, system_id: str, password: str, provider: external.Provider):
+    def __init__(self, system_id: str, password: str, provider: external.Provider, server: 'Server'):
         self.system_id = system_id
         self.password = password
+        self.server = server
         self.connections = set()
         self.mdispatcher = messaging.Dispatcher(
             self.system_id, self.password, provider)
@@ -96,6 +97,11 @@ class Server:
         self.port = port
         self.provider = provider
 
+        # AsyncIO event loop, created by run()
+        self.loop = None
+        # AsyncIO TCP Server object, created by run()
+        self.aserver = None
+
         # Maps system_ids to client objects.
         self._clients = {} # type: Dict[str, Client]
 
@@ -103,7 +109,7 @@ class Server:
         self._unbind(conn)
 
         if sid not in self._clients:
-            self._clients[sid] = Client(sid, pwd, self.provider)
+            self._clients[sid] = Client(sid, pwd, self.provider, self)
 
         self._clients[sid].connections.add(conn)
         conn.mode = m
@@ -241,16 +247,29 @@ class Server:
         conn.w.close()
         self._unbind(conn)
 
+    def run(self):
+        self.loop = asyncio.new_event_loop()
 
-    async def start(self):
         async def conncb(r: asyncio.StreamReader, w: asyncio.StreamWriter):
             conn = Connection(self, r, w)
             await self._on_client_connected(conn)
 
         logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
-        await asyncio.start_server(conncb, self.host, self.port)
 
-    def run(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.start())
-        loop.run_forever()
+        server_gen = asyncio.start_server(conncb, self.host, self.port, loop=self.loop)
+        self.aserver = self.loop.run_until_complete(server_gen)
+
+        try:
+            self.loop.run_until_complete(self.aserver.wait_closed())
+        except asyncio.CancelledError:
+            logger.info('Event loop has been cancelled')
+
+        self.loop.close()
+
+    def stop(self):
+        def _stop_cb():
+            self.aserver.close()
+            for task in asyncio.Task.all_tasks(loop=self.loop):
+                task.cancel()
+
+        self.loop.call_soon_threadsafe(_stop_cb)
