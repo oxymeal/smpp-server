@@ -46,7 +46,7 @@ class EnquireLinkTestCase(unittest.TestCase):
         self.sthread.join()
 
     def test_enquire_link_resp(self):
-        client = Client('localhost', TEST_SERVER_PORT)
+        client = Client('localhost', TEST_SERVER_PORT, timeout=1)
         client.connect()
 
         command = make_pdu('enquire_link', client=client)
@@ -68,7 +68,7 @@ class BindStatusCheckingTestCase(unittest.TestCase):
         self.sthread.join()
 
     def test_nobind_nack(self):
-        client = Client('localhost', TEST_SERVER_PORT)
+        client = Client('localhost', TEST_SERVER_PORT, timeout=1)
         client.connect()
 
         cmd = make_pdu('submit_sm', client=client,
@@ -83,7 +83,7 @@ class BindStatusCheckingTestCase(unittest.TestCase):
         self.assertEqual(resp.status, consts.SMPP_ESME_RINVBNDSTS)
 
     def test_rcv_submit_nack(self):
-        client = Client('localhost', TEST_SERVER_PORT)
+        client = Client('localhost', TEST_SERVER_PORT, timeout=1)
         client.connect()
         client.bind_receiver()
 
@@ -109,19 +109,19 @@ class AsyncDispatchTestCase(unittest.TestCase):
 
     @timeout(seconds=1)
     def test_async_eqlinks(self):
-        c1 = Client('localhost', TEST_SERVER_PORT)
+        c1 = Client('localhost', TEST_SERVER_PORT, timeout=1)
         c1.connect()
         cmd1 = make_pdu('enquire_link', client=c1)
         cmd1.sequence = 1
         c1.send_pdu(cmd1)
 
-        c2 = Client('localhost', TEST_SERVER_PORT)
+        c2 = Client('localhost', TEST_SERVER_PORT, timeout=1)
         c2.connect()
         cmd2 = make_pdu('enquire_link', client=c2)
         cmd2.sequence = 2
         c2.send_pdu(cmd2)
 
-        c3 = Client('localhost', TEST_SERVER_PORT)
+        c3 = Client('localhost', TEST_SERVER_PORT, timeout=1)
         c3.connect()
         cmd3 = make_pdu('enquire_link', client=c3)
         cmd3.sequence = 3
@@ -163,7 +163,7 @@ class BindAuthTestCase(unittest.TestCase):
         self.sthread.join()
 
     def test_auth_bind(self):
-        client = Client('localhost', TEST_SERVER_PORT)
+        client = Client('localhost', TEST_SERVER_PORT, timeout=1)
         client.connect()
 
         # Should not raise
@@ -171,7 +171,7 @@ class BindAuthTestCase(unittest.TestCase):
             system_id=self.CORRECT_SID, password=self.CORRECT_PWD)
 
     def test_unauth_bind(self):
-        client = Client('localhost', TEST_SERVER_PORT)
+        client = Client('localhost', TEST_SERVER_PORT, timeout=1)
         client.connect()
 
         with self.assertRaises(PDUError):
