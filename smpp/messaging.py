@@ -75,7 +75,9 @@ class Dispatcher:
                 body=pdu.short_message
             )
 
-            if pdu.esm_class == parse.STORE_AND_FORWARD: #Store and forward
+            msg_mode = pdu.esm_class & parse.ESM_CLASS_MODE_MASK
+
+            if msg_mode in [parse.ESM_CLASS_MODE_DEFAULT, parse.ESM_CLASS_MODE_STORE_AND_FORWARD]:
                 logger.info('Dispatch SaF PDU with esm_class = {}'.format(pdu.esm_class))
 
                 message_id = str(uuid.uuid4())[:8]
@@ -128,11 +130,12 @@ class Dispatcher:
                     await rs.send_to_rcv(deliver_sm)
 
                 return
-
-            elif pdu.esm_class in parse.DATAGRAMM: #Dategramm
-                return
-            elif pdu.esm_class == parse.TRANSACTION: #Transaction
-                return
+            else:
+                logger.error("Unexpected message mode: {}".format(msg_mode))
+                nack = parse.GenericNack()
+                nack.sequence_number = pdu.sequence_number
+                nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+                await rs.send(nack)
 
         nack = parse.GenericNack()
         nack.sequence_number = pdu.sequence_number
