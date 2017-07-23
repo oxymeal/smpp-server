@@ -76,6 +76,7 @@ class Dispatcher:
             )
 
             if pdu.esm_class == parse.STORE_AND_FORWARD: #Store and forward
+                logger.info('Dispatch SaF PDU with esm_class = {}'.format(pdu.esm_class))
 
                 message_id = str(uuid.uuid4())[:8]
 
