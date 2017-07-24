@@ -114,7 +114,9 @@ class Dispatcher:
                         status = sm_status
                         break
 
-                if status == external.DeliveryStatus.OK and pdu.registered_delivery == 1:
+                smsc_receipt = pdu.registered_delivery & parse.REGDEL_SMSC_RECEIPT_MASK
+
+                if status == external.DeliveryStatus.OK and smsc_receipt == parse.REGDEL_SMSC_RECEIPT_REQUIRED:
 
                     deliver_sm = parse.DeliverSm()
                     deliver_sm.service_type = pdu.service_type

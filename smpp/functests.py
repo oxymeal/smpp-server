@@ -241,7 +241,7 @@ class MessagingTestCase(unittest.TestCase):
 
         ssm = t.send_message(
             esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
-            registered_delivery=0x00000001, # Request delivery receipt
+            registered_delivery=0b11100001, # Request delivery receipt with noise bits
             source_addr_ton=12,
             source_addr_npi=34,
             source_addr="src",
