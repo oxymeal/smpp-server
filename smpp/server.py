@@ -26,6 +26,7 @@ class Connection:
         self.w = w
         self.mode = Mode.UNBOUND
         self.client = client
+        self.last_seqnum = 0
 
     def __repr__(self) -> str:
         return "Connection({})".format(self.mode)
@@ -40,6 +41,9 @@ class Connection:
             len(pdu_bytes), self.system_id, self.peer))
 
         pdu = parse.unpack_pdu(pdu_bytes)
+
+        if pdu.sequence_number > self.last_seqnum:
+            self.last_seqnum = pdu.sequence_number
 
         return pdu
 
@@ -65,12 +69,17 @@ class Connection:
         self.w.write(pdu_bytes)
         await self.w.drain()
 
+    async def send_new_seqnum(self, pdu: parse.PDU):
+        self.last_seqnum += 1
+        pdu.sequence_number = self.last_seqnum
+        await self.send(pdu)
+
     async def send_to_rcv(self, pdu: parse.PDU):
         logger.debug('Sending {} for all receivers of {}'.format(
             pdu.command, self.system_id))
 
         recvs = self.server.get_receivers(self.system_id)
-        tasks = [c.send(pdu) for c in recvs]
+        tasks = [c.send_new_seqnum(pdu) for c in recvs]
         await asyncio.gather(*tasks, loop=self.client.server.loop)
 
     @property
