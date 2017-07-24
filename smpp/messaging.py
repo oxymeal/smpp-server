@@ -120,14 +120,14 @@ class Dispatcher:
 
                     deliver_sm = parse.DeliverSm()
                     deliver_sm.service_type = pdu.service_type
-                    deliver_sm.source_addr_ton = pdu.source_addr_ton
-                    deliver_sm.source_addr_npi = pdu.source_addr_npi
-                    deliver_sm.source_addr = pdu.source_addr
-                    deliver_sm.dest_addr_ton = pdu.dest_addr_ton
-                    deliver_sm.dest_addr_npi = pdu.dest_addr_npi
-                    deliver_sm.destination_addr = pdu.destination_addr
+                    deliver_sm.source_addr_ton = pdu.dest_addr_ton
+                    deliver_sm.source_addr_npi = pdu.dest_addr_npi
+                    deliver_sm.source_addr = pdu.destination_addr
+                    deliver_sm.dest_addr_ton = pdu.source_addr_ton
+                    deliver_sm.dest_addr_npi = pdu.source_addr_npi
+                    deliver_sm.destination_addr = pdu.source_addr
                     deliver_sm.sequence_number = pdu.sequence_number
-                    deliver_sm.short_message = pdu.short_message
+                    deliver_sm.short_message = "Message was delivered succesfully"
 
                     await rs.send_to_rcv(deliver_sm)
 
