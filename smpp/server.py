@@ -30,6 +30,19 @@ class Connection:
     def __repr__(self) -> str:
         return "Connection({})".format(self.mode)
 
+    async def read(self) -> parse.PDU:
+        pdu_len_b = await self.r.readexactly(4)
+        pdu_len, = struct.unpack("!I", pdu_len_b)
+
+        pdu_body = await self.r.readexactly(pdu_len - 4)
+        pdu_bytes = pdu_len_b + pdu_body
+        logger.debug('PDU in {} bytes received from {} at {}'.format(
+            len(pdu_bytes), self.system_id, self.peer))
+
+        pdu = parse.unpack_pdu(pdu_bytes)
+
+        return pdu
+
     async def send(self, pdu: parse.PDU):
         logger.debug('Sending {} for {} at {}'.format(
             pdu.command, self.system_id, self.peer))
@@ -209,26 +222,9 @@ class Server:
 
         try:
             while True:
-                pdu_len_b = await conn.r.readexactly(4)
-                if not pdu_len_b:
-                    logger.debug(
-                        'EOF while reading pdu length from {} at {}'.format(conn.system_id, conn.peer))
-                    break
-
-                pdu_len, = struct.unpack("!I", pdu_len_b)
-
-                pdu_body = await conn.r.readexactly(pdu_len - 4)
-                if not pdu_body or len(pdu_body) < pdu_len - 4:
-                    logger.debug(
-                        'EOF while reading pdu from {} at {}'.format(conn.system_id, conn.peer))
-                    break
-
-                pdu_bytes = pdu_len_b + pdu_body
-                logger.debug('PDU in {} bytes received from {} at {}'.format(
-                    len(pdu_bytes), conn.system_id, conn.peer))
 
                 try:
-                    pdu = parse.unpack_pdu(pdu_bytes)
+                    pdu = await conn.read()
                 except parse.UnpackingError as e:
                     logger.error(
                         'Error while unpacking PDU bytes from {} at {}: {}'.format(
