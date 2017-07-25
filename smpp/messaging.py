@@ -93,7 +93,7 @@ class Dispatcher:
 
         status = ""
         while True:
-            sm_status = self.eprovider.deliver(sm)
+            sm_status = await self.eprovider.deliver(sm)
 
             if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
                 status = sm_status

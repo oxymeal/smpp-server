@@ -32,14 +32,14 @@ class Provider:
     Этот класс используется как интерфейс к внешнему доставщику сообщений.
     """
 
-    def authenticate(self, system_id: str, password: str) -> bool:
+    async def authenticate(self, system_id: str, password: str) -> bool:
         """
         Метод возвращает True, если аутентификация пользователя с данными
         system_id и паролем успешна.
         """
         raise NotImplementedError('authenticate')
 
-    def deliver(self, sm: ShortMessage) -> DeliveryStatus:
+    async def deliver(self, sm: ShortMessage) -> DeliveryStatus:
         """
         Метод выполняет попытку доставки короткого сообщения и возвращает
         один и перечисленных в DeliveryStatus результатов отправки.

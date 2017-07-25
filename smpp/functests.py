@@ -145,7 +145,7 @@ class BindAuthTestCase(unittest.TestCase):
             self.csid = csid
             self.cpwd = cpwd
 
-        def authenticate(self, system_id: str, password: str) -> bool:
+        async def authenticate(self, system_id: str, password: str) -> bool:
             return self.csid == system_id and self.cpwd == password
 
 
@@ -196,10 +196,10 @@ class MessagingTestCase(unittest.TestCase):
             self.msem = threading.Semaphore(0)
             self.messages = []
 
-        def authenticate(self, system_id: str, password: str) -> bool:
+        async def authenticate(self, system_id: str, password: str) -> bool:
             return True
 
-        def deliver(self, sm: external.ShortMessage) -> external.DeliveryStatus:
+        async def deliver(self, sm: external.ShortMessage) -> external.DeliveryStatus:
             with self.mlock:
                 self.messages.append(sm)
 

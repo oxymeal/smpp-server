@@ -160,7 +160,7 @@ class Server:
             if conn.can_receive():
                 yield conn
 
-    def do_bind(self, conn: Connection, pdu: parse.PDU) -> parse.PDU:
+    async def do_bind(self, conn: Connection, pdu: parse.PDU) -> parse.PDU:
         if pdu.command == parse.Command.BIND_RECEIVER:
             resp = parse.BindReceiverResp()
         elif pdu.command == parse.Command.BIND_TRANSMITTER:
@@ -173,7 +173,7 @@ class Server:
 
         if self.provider:
             logger.debug('Using provider to authenticate user')
-            is_auth = self.provider.authenticate(pdu.system_id, pdu.password)
+            is_auth = await self.provider.authenticate(pdu.system_id, pdu.password)
             if not is_auth:
                 logger.error('Failed to authenticate {} at {}'.format(pdu.system_id, conn.peer))
                 resp.command_status = parse.COMMAND_STATUS_ESME_RINVPASWD
@@ -201,7 +201,7 @@ class Server:
         elif pdu.command in [parse.Command.BIND_RECEIVER,
                              parse.Command.BIND_TRANSMITTER,
                              parse.Command.BIND_TRANSCEIVER]:
-            resp = self.do_bind(conn, pdu)
+            resp = await self.do_bind(conn, pdu)
             await conn.send(resp)
             return
         elif pdu.command == parse.Command.UNBIND:
