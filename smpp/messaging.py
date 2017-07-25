@@ -62,6 +62,25 @@ class Dispatcher:
             for _ in range(8)
         ])
 
+    @staticmethod
+    def parse_validity_period(vp: str) -> datetime:
+        time_offset = vp[13:15]
+        time_offset_sign = vp[-1]
+
+        time_offset_in_minutes = int(time_offset) * 15
+        time_offset_hours = time_offset_in_minutes // 60
+        time_offset_minutes = time_offset_in_minutes - time_offset_hours * 60
+
+        time_offset_hours_formatted = str(time_offset_hours).rjust(2, "0")
+        time_offset_minutes_formatted = str(time_offset_minutes).rjust(2, "0")
+        time_offset_formatted = "".join([time_offset_sign, time_offset_hours_formatted, time_offset_minutes_formatted])
+
+        validity_period_formatted = pdu.validity_period[:12] + time_offset_formatted
+
+        sm_validity_period = datetime.strptime(validity_period_formatted, "%y%m%d%H%M%S%z")
+
+        return sm_validity_period
+
     async def _store_and_forward(
         self, message_id: str, sm: external.ShortMessage, pdu: parse.SubmitSm) -> parse.DeliverSm:
 
@@ -70,20 +89,7 @@ class Dispatcher:
         if not pdu.validity_period:
             sm_validity_period = datetime.now() + timedelta(0, DEFAULT_VALIDITY_PERIOD)
         else:
-            time_offset = pdu.validity_period[13:15]
-            time_offset_sign = pdu.validity_period[-1]
-
-            time_offset_in_minutes = int(time_offset) * 15
-            time_offset_hours = time_offset_in_minutes // 60
-            time_offset_minutes = time_offset_in_minutes - time_offset_hours * 60
-
-            time_offset_hours_formatted = str(time_offset_hours).rjust(2, "0")
-            time_offset_minutes_formatted = str(time_offset_minutes).rjust(2, "0")
-            time_offset_formatted = "".join([time_offset_sign, time_offset_hours_formatted, time_offset_minutes_formatted])
-
-            validity_period_formatted = pdu.validity_period[:12] + time_offset_formatted
-
-            sm_validity_period = datetime.strptime(validity_period_formatted, "%y%m%d%H%M%S%z")
+            sm_validity_period = self.parse_validity_period(pdu.validity_period)
 
         status = ""
         while True:
