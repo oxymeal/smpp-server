@@ -1,4 +1,5 @@
 import struct
+import datetime
 from enum import Enum
 from typing import Tuple, Any
 
@@ -1143,6 +1144,44 @@ class ReplaceSmResp(PDU):
 
     def pack(self) -> bytearray:
         return self._pack_header()
+
+
+RECEIPT_DELIVERED = "DELIVRD"
+RECEIPT_EXPIRED = "EXPIRED"
+RECEIPT_DELETED = "DELETED"
+RECEIPT_UNDELIVERABLE = "UNDELIV"
+RECEIPT_ACCEPTED = "ACCEPTD"
+RECEIPT_UNKNOWN = "UNKNOWN"
+RECEIPT_REJECTED = "REJECTD"
+
+
+class DeliveryReceipt:
+    def __init__(self):
+        self.id = ""
+        self.sub = 1
+        self.dlvrd = 0
+        self.submit_date = datetime.datetime.now()
+        self.done_date = datetime.datetime.now()
+        self.stat = ""
+        self.err = 0
+        self.text = ""
+
+    def to_str(self) -> str:
+        return "id:{} sub:{} dlvrd:{} submit date:{} done date:{} stat:{} err:{} text:{}".format(
+            self.id,
+            self.zfil(self.sub),
+            self.zfil(self.dlvrd),
+            self.fmt_date(self.submit_date),
+            self.fmt_date(self.done_date), self.stat, self.err, self.text[:20])
+
+    @staticmethod
+    def fmt_date(date: datetime.datetime) -> str:
+        return date.strftime("%y%m%d%H%M")
+
+    @staticmethod
+    def zfil(a: int) -> str:
+        return "{}".format(str(a).zfill(3))
+
 
 _COMMAND_CLASSES = {
     Command.BIND_RECEIVER: BindReceiver,
