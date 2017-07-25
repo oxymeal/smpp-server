@@ -1,5 +1,5 @@
 import logging
-import uuid
+import random
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -51,6 +51,16 @@ class Dispatcher:
         self.system_id = system_id
         self.password = password
         self.eprovider = eprovider
+
+    @staticmethod
+    def new_message_id() -> str:
+        """
+        Возвращает строку из 8 случайных 16-чных цифр.
+        """
+        return "".join([
+            random.choice("0123456789abcdef")
+            for _ in range(8)
+        ])
 
     async def _store_and_forward(
         self, message_id: str, sm: external.ShortMessage, pdu: parse.SubmitSm) -> parse.DeliverSm:
@@ -106,7 +116,7 @@ class Dispatcher:
         msg_mode = pdu.esm_class & parse.ESM_CLASS_MODE_MASK
 
         if msg_mode in [parse.ESM_CLASS_MODE_DEFAULT, parse.ESM_CLASS_MODE_STORE_AND_FORWARD]:
-            message_id = str(uuid.uuid4())[:8]
+            message_id = self.new_message_id()
 
             submit_sm_resp = parse.SubmitSmResp()
             submit_sm_resp.message_id = message_id
