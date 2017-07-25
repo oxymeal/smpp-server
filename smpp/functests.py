@@ -14,7 +14,7 @@ from timeout_decorator import timeout
 
 
 import logging
-logging.basicConfig(level=logging.CRITICAL)
+logging.basicConfig(level=logging.ERROR)
 
 
 TEST_SERVER_PORT = 2775
