@@ -1,7 +1,6 @@
 import logging
 import uuid
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 from . import external, parse
