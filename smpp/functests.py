@@ -1,6 +1,7 @@
 import time
 import socket
 import unittest
+import re
 import threading
 from typing import List
 
@@ -239,6 +240,8 @@ class MessagingTestCase(unittest.TestCase):
         rx.connect()
         rx.bind_receiver(system_id="nomtc", password="pwd")
 
+        message_text = "Hello world!"
+
         ssm = t.send_message(
             esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
             registered_delivery=0b11100001, # Request delivery receipt with noise bits
@@ -248,7 +251,7 @@ class MessagingTestCase(unittest.TestCase):
             dest_addr_ton=56,
             dest_addr_npi=67,
             destination_addr="dst",
-            short_message=b"Hello world!")
+            short_message=message_text.encode('ascii'))
 
         ssmr = t.read_pdu()
         self.assertEqual(ssmr.command, 'submit_sm_resp')
@@ -268,25 +271,29 @@ class MessagingTestCase(unittest.TestCase):
         self.assertEqual(msg.dest_addr_ton, 56)
         self.assertEqual(msg.dest_addr_npi, 67)
         self.assertEqual(msg.destination_addr, "dst")
-        self.assertEqual(msg.body, "Hello world!")
+        self.assertEqual(msg.body, message_text)
+
+        receipt_regex = r'^id:(\S+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\S+) err:(\d+) text:(.+)$'
+
+        def test_receipt(pdu):
+            self.assertEqual(pdu.command, 'deliver_sm')
+            self.assertNotEqual(int(pdu.esm_class) & 0b00000100, 0)
+
+            m = re.search(receipt_regex, pdu.short_message.decode('ascii'))
+            self.assertIsNotNone(m, msg="Receipt text does not match regex")
+
+            rct_id, _, rct_dlvr, _, _, rct_stat, rct_err, rct_text = m.groups()
+            self.assertEqual(rct_id, ssmr.message_id.decode('ascii'))
+            self.assertEqual(int(rct_dlvr), 1)
+            self.assertEqual(rct_stat, 'DELIVRD')
+            self.assertEqual(int(rct_err), 0)
+            self.assertTrue(message_text.startswith(rct_text))
 
         r1rec = r1.read_pdu()
-        self.assertEqual(r1rec.command, 'deliver_sm')
-        self.assertEqual(int(r1rec.source_addr_ton), 56)
-        self.assertEqual(int(r1rec.source_addr_npi), 67)
-        self.assertEqual(r1rec.source_addr, b"dst")
-        self.assertEqual(int(r1rec.dest_addr_ton), 12)
-        self.assertEqual(int(r1rec.dest_addr_npi), 34)
-        self.assertEqual(r1rec.destination_addr, b"src")
+        test_receipt(r1rec)
 
         r2rec = r2.read_pdu()
-        self.assertEqual(r1rec.command, 'deliver_sm')
-        self.assertEqual(int(r2rec.source_addr_ton), 56)
-        self.assertEqual(int(r2rec.source_addr_npi), 67)
-        self.assertEqual(r2rec.source_addr, b"dst")
-        self.assertEqual(int(r2rec.dest_addr_ton), 12)
-        self.assertEqual(int(r2rec.dest_addr_npi), 34)
-        self.assertEqual(r2rec.destination_addr, b"src")
+        test_receipt(r2rec)
 
         with self.assertRaises(socket.timeout):
             rx.read_pdu()

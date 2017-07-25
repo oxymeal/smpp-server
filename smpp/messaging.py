@@ -99,7 +99,10 @@ class Dispatcher:
                 status = sm_status
                 break
 
+        # Return the delivery receipt pdu
+
         deliver_sm = parse.DeliverSm()
+        deliver_sm.esm_class = parse.ESM_CLASS_RECEIPT_STORE_AND_FORWARD
         deliver_sm.service_type = pdu.service_type
         deliver_sm.source_addr_ton = pdu.dest_addr_ton
         deliver_sm.source_addr_npi = pdu.dest_addr_npi
@@ -107,8 +110,14 @@ class Dispatcher:
         deliver_sm.dest_addr_ton = pdu.source_addr_ton
         deliver_sm.dest_addr_npi = pdu.source_addr_npi
         deliver_sm.destination_addr = pdu.source_addr
-        deliver_sm.sequence_number = pdu.sequence_number
-        deliver_sm.short_message = "Message was delivered succesfully"
+
+        dr = parse.DeliveryReceipt()
+        dr.id = message_id
+        dr.dlvrd = 1
+        dr.stat = parse.RECEIPT_DELIVERED
+        dr.text = sm.body
+        deliver_sm.short_message = dr.to_str()
+
         return deliver_sm
 
     async def _dispatch_submit_sm(self, pdu: parse.PDU, rs: ResponseSender):
