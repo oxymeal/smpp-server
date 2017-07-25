@@ -261,7 +261,7 @@ class MessagingTestCase(unittest.TestCase):
         self.assertEqual(msg.destination_addr, "dst")
         self.assertEqual(msg.body, message_text)
 
-    def test_successful_receipt(self):
+    def test_receipt_delivery(self):
         t = Client('localhost', TEST_SERVER_PORT, timeout=1)
         t.connect()
         t.bind_transmitter(system_id="mtc", password="pwd")
@@ -291,29 +291,53 @@ class MessagingTestCase(unittest.TestCase):
             destination_addr="dst",
             short_message=message_text.encode('ascii'))
 
+        r1rec = r1.read_pdu()
+        self.assertEqual(r1rec.command, 'deliver_sm')
+        self.assertNotEqual(int(r1rec.esm_class) & 0b00000100, 0)
+
+        r2rec = r2.read_pdu()
+        self.assertEqual(r2rec.command, 'deliver_sm')
+        self.assertNotEqual(int(r2rec.esm_class) & 0b00000100, 0)
+
+        with self.assertRaises(socket.timeout):
+            rx.read_pdu()
+
+    def test_successful_receipt(self):
+        t = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        t.connect()
+        t.bind_transmitter(system_id="mtc", password="pwd")
+
+        r1 = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        r1.connect()
+        r1.bind_receiver(system_id="mtc", password="pwd")
+
+        message_text = "Hello world!"
+
+        ssm = t.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b11100001, # Request delivery receipt with noise bits
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=message_text.encode('ascii'))
+
         ssmr = t.read_pdu()
 
         receipt_regex = r'^id:(\S+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\S+) err:(\d+) text:(.+)$'
 
-        def test_receipt(pdu):
-            self.assertEqual(pdu.command, 'deliver_sm')
-            self.assertNotEqual(int(pdu.esm_class) & 0b00000100, 0)
+        rec = r1.read_pdu()
+        self.assertEqual(rec.command, 'deliver_sm')
+        self.assertNotEqual(int(rec.esm_class) & 0b00000100, 0)
 
-            m = re.search(receipt_regex, pdu.short_message.decode('ascii'))
-            self.assertIsNotNone(m, msg="Receipt text does not match regex")
+        m = re.search(receipt_regex, rec.short_message.decode('ascii'))
+        self.assertIsNotNone(m, msg="Receipt text does not match regex")
 
-            rct_id, _, rct_dlvr, _, _, rct_stat, rct_err, rct_text = m.groups()
-            self.assertEqual(rct_id, ssmr.message_id.decode('ascii'))
-            self.assertEqual(int(rct_dlvr), 1)
-            self.assertEqual(rct_stat, 'DELIVRD')
-            self.assertEqual(int(rct_err), 0)
-            self.assertTrue(message_text.startswith(rct_text))
-
-        r1rec = r1.read_pdu()
-        test_receipt(r1rec)
-
-        r2rec = r2.read_pdu()
-        test_receipt(r2rec)
-
-        with self.assertRaises(socket.timeout):
-            rx.read_pdu()
+        rct_id, _, rct_dlvr, _, _, rct_stat, rct_err, rct_text = m.groups()
+        self.assertEqual(rct_id, ssmr.message_id.decode('ascii'))
+        self.assertEqual(int(rct_dlvr), 1)
+        self.assertEqual(rct_stat, 'DELIVRD')
+        self.assertEqual(int(rct_err), 0)
+        self.assertTrue(message_text.startswith(rct_text))
