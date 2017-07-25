@@ -91,12 +91,17 @@ class Dispatcher:
         else:
             sm_validity_period = self.parse_validity_period(pdu.validity_period)
 
-        status = ""
+        final_status = None
+        expired = False
         while True:
-            sm_status = await self.eprovider.deliver(sm)
+            status = await self.eprovider.deliver(sm)
 
-            if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
-                status = sm_status
+            if not status.should_retry():
+                final_status = status
+                break
+
+            if datetime.now() < sm_validity_period:
+                expired = True
                 break
 
         # Return the delivery receipt pdu
@@ -113,9 +118,28 @@ class Dispatcher:
 
         dr = parse.DeliveryReceipt()
         dr.id = message_id
-        dr.dlvrd = 1
-        dr.stat = parse.RECEIPT_DELIVERED
         dr.text = sm.body
+
+        if final_status == external.DeliveryStatus.OK:
+            dr.dlvrd = 1
+            dr.err = 0
+        else:
+            dr.dlvrd = 0
+            dr.err = 1
+
+        if final_status == external.DeliveryStatus.OK:
+            dr.stat = parse.RECEIPT_DELIVERED
+        elif final_status == external.DeliveryStatus.UNDELIVERABLE:
+            dr.stat = parse.RECEIPT_UNDELIVERABLE
+        elif final_status == external.DeliveryStatus.NO_BALANCE:
+            dr.stat = parse.RECEIPT_REJECTED
+        elif final_status == external.DeliveryStatus.AUTH_FAILED:
+            dr.stat = parse.RECEIPT_REJECTED
+        elif expired:
+            dr.stat = parse.RECEIPT_EXPIRED
+        else:
+            dr.stat = parse.RECEIPT_UNKNOWN
+
         deliver_sm.short_message = dr.to_str()
 
         return deliver_sm

@@ -25,6 +25,11 @@ class DeliveryStatus(Enum):
     GENERIC_ERROR = 1 # Неуказанная ошибка
     AUTH_FAILED = 2   # Неверный system_id/пароль
     NO_BALANCE = 3    # Недостаточно средств на счете
+    UNDELIVERABLE = 4 # Сообщение не может быть доставлено из-за какой-либо ошибки в запросе отправки
+    TRY_LATER = 5     # Повторную попытку отправки следует совершить чуть позже
+
+    def should_retry(self):
+        return self in [DeliveryStatus.GENERIC_ERROR, DeliveryStatus.TRY_LATER]
 
 
 class Provider:
