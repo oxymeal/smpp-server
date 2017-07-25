@@ -95,7 +95,8 @@ ESM_CLASS_RECEIPT_STORE_AND_FORWARD = 0b00000100
 
 REGDEL_SMSC_RECEIPT_MASK = 0b00000011
 REGDEL_SMSC_RECEIPT_NOT_REQUIRED = 0b00000000
-REGDEL_SMSC_RECEIPT_REQUIRED = 0b00000001
+REGDEL_SMSC_RECEIPT_ALWAYS = 0b00000001
+REGDEL_SMSC_RECEIPT_FAILURE = 0b00000010
 
 class PackingError(ValueError):
     """
@@ -1175,6 +1176,9 @@ class DeliveryReceipt:
             self.zfil(self.dlvrd),
             self.fmt_date(self.submit_date),
             self.fmt_date(self.done_date), self.stat, self.err, self.text[:20])
+
+    def is_successful(self) -> bool:
+        return self.stat == RECEIPT_DELIVERED
 
     @staticmethod
     def fmt_date(date: datetime.datetime) -> str:

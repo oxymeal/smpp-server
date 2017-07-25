@@ -357,7 +357,7 @@ class MessagingTestCase(unittest.TestCase):
 
         ssm = t.send_message(
             esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
-            registered_delivery=0b11100001, # Request delivery receipt with noise bits
+            registered_delivery=0b11100010, # Request delivery receipt with noise bits
             source_addr_ton=12,
             source_addr_npi=34,
             source_addr="src",
@@ -383,3 +383,28 @@ class MessagingTestCase(unittest.TestCase):
         self.assertEqual(rct_stat, 'UNDELIV')
         self.assertEqual(int(rct_err), 1)
         self.assertTrue(message_text.startswith(rct_text))
+
+    def test_no_success_receipt_required(self):
+        t = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        t.connect()
+        t.bind_transmitter(system_id="mtc", password="pwd")
+
+        r1 = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        r1.connect()
+        r1.bind_receiver(system_id="mtc", password="pwd")
+
+        message_text = "Hello world!"
+
+        ssm = t.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b11100010, # Request delivery receipt on failure only
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=message_text.encode('ascii'))
+
+        with self.assertRaises(socket.timeout):
+            r1.read_pdu()

@@ -82,7 +82,7 @@ class Dispatcher:
         return sm_validity_period
 
     async def _store_and_forward(
-        self, message_id: str, sm: external.ShortMessage, pdu: parse.SubmitSm) -> parse.DeliverSm:
+        self, message_id: str, sm: external.ShortMessage, pdu: parse.SubmitSm) -> Optional[parse.DeliverSm]:
 
         logger.info('Dispatching SaF message, esm_class = {}'.format(pdu.esm_class))
 
@@ -142,7 +142,15 @@ class Dispatcher:
 
         deliver_sm.short_message = dr.to_str()
 
-        return deliver_sm
+        receipt_flags = pdu.registered_delivery & parse.REGDEL_SMSC_RECEIPT_MASK
+        receipt_always = receipt_flags == parse.REGDEL_SMSC_RECEIPT_ALWAYS
+        receipt_failure = receipt_flags == parse.REGDEL_SMSC_RECEIPT_FAILURE
+        send_receipt = receipt_always or (receipt_failure and not dr.is_successful())
+
+        if send_receipt:
+            return deliver_sm
+        else:
+            return None
 
     async def _dispatch_submit_sm(self, pdu: parse.PDU, rs: ResponseSender):
         sm = external.ShortMessage(
@@ -163,10 +171,9 @@ class Dispatcher:
             await rs.send(submit_sm_resp)
 
             dsm = await self._store_and_forward(message_id, sm, pdu)
-
-            smsc_receipt = pdu.registered_delivery & parse.REGDEL_SMSC_RECEIPT_MASK
-            if smsc_receipt == parse.REGDEL_SMSC_RECEIPT_REQUIRED:
+            if dsm:
                 await rs.send_to_rcv(dsm)
+
         else:
             logger.error("Unexpected message mode: {}".format(msg_mode))
             nack = parse.GenericNack()
