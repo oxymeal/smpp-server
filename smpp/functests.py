@@ -228,18 +228,6 @@ class MessagingTestCase(unittest.TestCase):
         t.connect()
         t.bind_transmitter(system_id="mtc", password="pwd")
 
-        r1 = Client('localhost', TEST_SERVER_PORT, timeout=1)
-        r1.connect()
-        r1.bind_receiver(system_id="mtc", password="pwd")
-
-        r2 = Client('localhost', TEST_SERVER_PORT, timeout=1)
-        r2.connect()
-        r2.bind_receiver(system_id="mtc", password="pwd")
-
-        rx = Client('localhost', TEST_SERVER_PORT, timeout=1)
-        rx.connect()
-        rx.bind_receiver(system_id="nomtc", password="pwd")
-
         message_text = "Hello world!"
 
         ssm = t.send_message(
@@ -272,6 +260,38 @@ class MessagingTestCase(unittest.TestCase):
         self.assertEqual(msg.dest_addr_npi, 67)
         self.assertEqual(msg.destination_addr, "dst")
         self.assertEqual(msg.body, message_text)
+
+    def test_successful_receipt(self):
+        t = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        t.connect()
+        t.bind_transmitter(system_id="mtc", password="pwd")
+
+        r1 = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        r1.connect()
+        r1.bind_receiver(system_id="mtc", password="pwd")
+
+        r2 = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        r2.connect()
+        r2.bind_receiver(system_id="mtc", password="pwd")
+
+        rx = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        rx.connect()
+        rx.bind_receiver(system_id="nomtc", password="pwd")
+
+        message_text = "Hello world!"
+
+        ssm = t.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b11100001, # Request delivery receipt with noise bits
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=message_text.encode('ascii'))
+
+        ssmr = t.read_pdu()
 
         receipt_regex = r'^id:(\S+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\S+) err:(\d+) text:(.+)$'
 
