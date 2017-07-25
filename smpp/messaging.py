@@ -53,6 +53,80 @@ class Dispatcher:
         self.password = password
         self.eprovider = eprovider
 
+    async def _store_and_forward(
+        self, message_id: str, sm: external.ShortMessage, pdu: parse.SubmitSm) -> parse.DeliverSm:
+
+        logger.info('Dispatching SaF message, esm_class = {}'.format(pdu.esm_class))
+
+        if not pdu.validity_period:
+            sm_validity_period = datetime.now() + timedelta(0, DEFAULT_VALIDITY_PERIOD)
+        else:
+            time_offset = pdu.validity_period[13:15]
+            time_offset_sign = pdu.validity_period[-1]
+
+            time_offset_in_minutes = int(time_offset) * 15
+            time_offset_hours = time_offset_in_minutes // 60
+            time_offset_minutes = time_offset_in_minutes - time_offset_hours * 60
+
+            time_offset_hours_formatted = str(time_offset_hours).rjust(2, "0")
+            time_offset_minutes_formatted = str(time_offset_minutes).rjust(2, "0")
+            time_offset_formatted = "".join([time_offset_sign, time_offset_hours_formatted, time_offset_minutes_formatted])
+
+            validity_period_formatted = pdu.validity_period[:12] + time_offset_formatted
+
+            sm_validity_period = datetime.strptime(validity_period_formatted, "%y%m%d%H%M%S%z")
+
+        status = ""
+        while True:
+            sm_status = self.eprovider.deliver(sm)
+
+            if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
+                status = sm_status
+                break
+
+        deliver_sm = parse.DeliverSm()
+        deliver_sm.service_type = pdu.service_type
+        deliver_sm.source_addr_ton = pdu.dest_addr_ton
+        deliver_sm.source_addr_npi = pdu.dest_addr_npi
+        deliver_sm.source_addr = pdu.destination_addr
+        deliver_sm.dest_addr_ton = pdu.source_addr_ton
+        deliver_sm.dest_addr_npi = pdu.source_addr_npi
+        deliver_sm.destination_addr = pdu.source_addr
+        deliver_sm.sequence_number = pdu.sequence_number
+        deliver_sm.short_message = "Message was delivered succesfully"
+        return deliver_sm
+
+    async def _dispatch_submit_sm(self, pdu: parse.PDU, rs: ResponseSender):
+        sm = external.ShortMessage(
+            system_id=self.system_id, password=self.password,
+            source_addr_ton=pdu.source_addr_ton, source_addr_npi=pdu.source_addr_npi, source_addr=pdu.source_addr,
+            dest_addr_ton=pdu.dest_addr_ton, dest_addr_npi=pdu.dest_addr_npi, destination_addr=pdu.destination_addr,
+            body=pdu.short_message
+        )
+
+        msg_mode = pdu.esm_class & parse.ESM_CLASS_MODE_MASK
+
+        if msg_mode in [parse.ESM_CLASS_MODE_DEFAULT, parse.ESM_CLASS_MODE_STORE_AND_FORWARD]:
+            message_id = str(uuid.uuid4())[:8]
+
+            submit_sm_resp = parse.SubmitSmResp()
+            submit_sm_resp.message_id = message_id
+            submit_sm_resp.sequence_number = pdu.sequence_number
+            await rs.send(submit_sm_resp)
+
+            dsm = await self._store_and_forward(message_id, sm, pdu)
+
+            smsc_receipt = pdu.registered_delivery & parse.REGDEL_SMSC_RECEIPT_MASK
+            if smsc_receipt == parse.REGDEL_SMSC_RECEIPT_REQUIRED:
+                await rs.send_to_rcv(dsm)
+        else:
+            logger.error("Unexpected message mode: {}".format(msg_mode))
+            nack = parse.GenericNack()
+            nack.sequence_number = pdu.sequence_number
+            nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+            await rs.send(nack)
+
+
     async def receive(self, pdu: parse.PDU, rs: ResponseSender):
         """
         Обрабатывает очередной входящий пакет. Если на этот пакет следует
@@ -68,78 +142,9 @@ class Dispatcher:
         logger.info('Dispatching PDU {}'.format(pdu.command))
 
         if pdu.command == parse.Command.SUBMIT_SM:
-            sm = external.ShortMessage(
-                system_id=self.system_id, password=self.password,
-                source_addr_ton=pdu.source_addr_ton, source_addr_npi=pdu.source_addr_npi, source_addr=pdu.source_addr,
-                dest_addr_ton=pdu.dest_addr_ton, dest_addr_npi=pdu.dest_addr_npi, destination_addr=pdu.destination_addr,
-                body=pdu.short_message
-            )
-
-            msg_mode = pdu.esm_class & parse.ESM_CLASS_MODE_MASK
-
-            if msg_mode in [parse.ESM_CLASS_MODE_DEFAULT, parse.ESM_CLASS_MODE_STORE_AND_FORWARD]:
-                logger.info('Dispatch SaF PDU with esm_class = {}'.format(pdu.esm_class))
-
-                message_id = str(uuid.uuid4())[:8]
-
-                submit_sm_resp = parse.SubmitSmResp()
-                submit_sm_resp.message_id = message_id
-                submit_sm_resp.sequence_number = pdu.sequence_number
-
-                await rs.send(submit_sm_resp)
-
-                if not pdu.validity_period:
-                    sm_validity_period = datetime.now() + timedelta(0, DEFAULT_VALIDITY_PERIOD)
-                else:
-                    time_offset = pdu.validity_period[13:15]
-                    time_offset_sign = pdu.validity_period[-1]
-
-                    time_offset_in_minutes = int(time_offset) * 15
-                    time_offset_hours = time_offset_in_minutes // 60
-                    time_offset_minutes = time_offset_in_minutes - time_offset_hours * 60
-
-                    time_offset_hours_formatted = str(time_offset_hours).rjust(2, "0")
-                    time_offset_minutes_formatted = str(time_offset_minutes).rjust(2, "0")
-                    time_offset_formatted = "".join([time_offset_sign, time_offset_hours_formatted, time_offset_minutes_formatted])
-
-                    validity_period_formatted = pdu.validity_period[:12] + time_offset_formatted
-
-                    sm_validity_period = datetime.strptime(validity_period_formatted, "%y%m%d%H%M%S%z")
-
-                status = ""
-                while True:
-                    sm_status = self.eprovider.deliver(sm)
-
-                    if sm_status == external.DeliveryStatus.OK or (datetime.now() < sm_validity_period):
-                        status = sm_status
-                        break
-
-                smsc_receipt = pdu.registered_delivery & parse.REGDEL_SMSC_RECEIPT_MASK
-
-                if status == external.DeliveryStatus.OK and smsc_receipt == parse.REGDEL_SMSC_RECEIPT_REQUIRED:
-
-                    deliver_sm = parse.DeliverSm()
-                    deliver_sm.service_type = pdu.service_type
-                    deliver_sm.source_addr_ton = pdu.dest_addr_ton
-                    deliver_sm.source_addr_npi = pdu.dest_addr_npi
-                    deliver_sm.source_addr = pdu.destination_addr
-                    deliver_sm.dest_addr_ton = pdu.source_addr_ton
-                    deliver_sm.dest_addr_npi = pdu.source_addr_npi
-                    deliver_sm.destination_addr = pdu.source_addr
-                    deliver_sm.sequence_number = pdu.sequence_number
-                    deliver_sm.short_message = "Message was delivered succesfully"
-
-                    await rs.send_to_rcv(deliver_sm)
-
-                return
-            else:
-                logger.error("Unexpected message mode: {}".format(msg_mode))
-                nack = parse.GenericNack()
-                nack.sequence_number = pdu.sequence_number
-                nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
-                await rs.send(nack)
-
-        nack = parse.GenericNack()
-        nack.sequence_number = pdu.sequence_number
-        nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
-        await rs.send_to_rcv(nack)
+            await self._dispatch_submit_sm(pdu, rs)
+        else:
+            nack = parse.GenericNack()
+            nack.sequence_number = pdu.sequence_number
+            nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
+            await rs.send_to_rcv(nack)
