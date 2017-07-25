@@ -9,7 +9,7 @@ from . import external, parse
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VALIDITY_PERIOD = 60
+DEFAULT_VALIDITY_PERIOD = 60 # In seconds
 
 
 class ResponseSender:
