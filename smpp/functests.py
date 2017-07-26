@@ -21,20 +21,42 @@ logging.basicConfig(level=logging.ERROR)
 TEST_SERVER_PORT = 2775
 
 
-def start_server_thread(**kwargs):
-    server = Server(port=TEST_SERVER_PORT, **kwargs)
+def start_server_thread(unix_sock=None, **kwargs):
+    if unix_sock:
+        server = Server(unix_sock=unix_sock, **kwargs)
+    else:
+        server = Server(port=TEST_SERVER_PORT, **kwargs)
+
     sproc = threading.Thread(target=server.run)
     sproc.start()
 
-    # Wait for port to opet
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # Wait for port to open
+
+    if unix_sock:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    else:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    CONNECTION_TIMEOUT = 2
+    RETRIES_INTERVAL = 0.1
+
+    waiting_time = 0
     while True:
-        res = s.connect_ex(('localhost', TEST_SERVER_PORT))
+        if unix_sock:
+            res = s.connect_ex(unix_sock)
+        else:
+            res = s.connect_ex(('localhost', TEST_SERVER_PORT))
+
         if res == 0:
             s.close()
             break
 
-        time.sleep(0.1)
+        waiting_time += RETRIES_INTERVAL
+        if waiting_time > CONNECTION_TIMEOUT:
+            s.close()
+            raise RuntimeError("Server did not start")
+
+        time.sleep(RETRIES_INTERVAL)
 
     return server, sproc
 
@@ -187,6 +209,29 @@ class BindAuthTestCase(unittest.TestCase):
         with self.assertRaises(PDUError):
             client.bind_transmitter(
                 system_id=self.INCORRECT_SID, password=self.INCORRECT_PWD)
+
+
+class UnixSocketTestCase(unittest.TestCase):
+    UNIX_SOCK = '/tmp/smpp_server_functest_server.sock'
+
+    def setUp(self):
+        self.server, self.sthread = start_server_thread(unix_sock=self.UNIX_SOCK)
+
+    def tearDown(self):
+        self.server.stop()
+        self.sthread.join()
+
+    def test_unix_sock_enquire_link(self):
+        # Simple sanity test
+        client = Client(unix_sock=self.UNIX_SOCK)
+        client.connect()
+
+        elink = make_pdu('enquire_link', client=client)
+        elink.sequence = 1
+        client.send_pdu(elink)
+
+        elink_resp = client.read_pdu()
+        self.assertEqual(elink_resp.sequence, elink.sequence)
 
 
 class MessagingTestCase(unittest.TestCase):

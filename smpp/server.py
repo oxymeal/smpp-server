@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import struct
 from collections import defaultdict
 from enum import Enum
@@ -114,9 +115,11 @@ class Client:
 
 
 class Server:
-    def __init__(self, host='0.0.0.0', port=2775, provider: external.Provider = None):
+    def __init__(self, host='0.0.0.0', port=2775, unix_sock=None, provider: external.Provider = None):
         self.host = host
         self.port = port
+        self.unix_sock = unix_sock
+
         self.provider = provider
 
         # AsyncIO event loop, created by run()
@@ -263,7 +266,11 @@ class Server:
 
         logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
 
-        server_gen = asyncio.start_server(conncb, self.host, self.port, loop=self.loop)
+        if self.unix_sock:
+            server_gen = asyncio.start_unix_server(conncb, self.unix_sock, loop=self.loop)
+        else:
+            server_gen = asyncio.start_server(conncb, self.host, self.port, loop=self.loop)
+
         self.aserver = self.loop.run_until_complete(server_gen)
 
         try:
@@ -274,9 +281,14 @@ class Server:
         self.loop.close()
 
     def stop(self):
-        def _stop_cb():
+        async def _stop_cb():
             self.aserver.close()
             for task in asyncio.Task.all_tasks(loop=self.loop):
                 task.cancel()
 
-        self.loop.call_soon_threadsafe(_stop_cb)
+            if self.unix_sock:
+                await self.aserver.wait_closed()
+                os.remove(self.unix_sock)
+
+        self.loop.call_soon_threadsafe(
+            lambda: asyncio.ensure_future(_stop_cb(), loop=self.loop))
