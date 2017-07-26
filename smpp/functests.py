@@ -342,8 +342,8 @@ class MessagingTestCase(unittest.TestCase):
         self.assertEqual(int(rct_err), 0)
         self.assertTrue(message_text.startswith(rct_text))
 
-    def test_undeliv_receipt(self):
-        self.provider.status = external.DeliveryStatus.UNDELIVERABLE
+    def _test_error_receipt(self, prov_status: external.DeliveryStatus, exp_rct_status: str):
+        self.provider.status = prov_status
 
         t = Client('localhost', TEST_SERVER_PORT, timeout=1)
         t.connect()
@@ -380,9 +380,18 @@ class MessagingTestCase(unittest.TestCase):
         rct_id, _, rct_dlvr, _, _, rct_stat, rct_err, rct_text = m.groups()
         self.assertEqual(rct_id, ssmr.message_id.decode('ascii'))
         self.assertEqual(int(rct_dlvr), 0)
-        self.assertEqual(rct_stat, 'UNDELIV')
+        self.assertEqual(rct_stat, exp_rct_status)
         self.assertEqual(int(rct_err), 1)
         self.assertTrue(message_text.startswith(rct_text))
+
+    def test_error_receipts(self):
+        self._test_error_receipt(external.DeliveryStatus.GENERIC_ERROR, 'EXPIRED')
+        self._test_error_receipt(external.DeliveryStatus.TRY_LATER, 'EXPIRED')
+
+        self._test_error_receipt(external.DeliveryStatus.AUTH_FAILED, 'REJECTD')
+        self._test_error_receipt(external.DeliveryStatus.NO_BALANCE, 'REJECTD')
+
+        self._test_error_receipt(external.DeliveryStatus.UNDELIVERABLE, 'UNDELIV')
 
     def test_no_success_receipt_required(self):
         t = Client('localhost', TEST_SERVER_PORT, timeout=1)
