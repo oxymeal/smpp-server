@@ -60,16 +60,22 @@ class Client(object):
 
     host = None
     port = None
+    unix_sock = None
     vendor = None
     _socket = None
     sequence_generator = None
 
-    def __init__(self, host, port, timeout=5, sequence_generator=None):
+    def __init__(self, host=None, port=None, unix_sock=None, timeout=5, sequence_generator=None):
         """Initialize"""
 
-        self.host = host
-        self.port = int(port)
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if unix_sock:
+            self.unix_sock = unix_sock
+            self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        else:
+            self.host = host
+            self.port = int(port)
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         self._socket.settimeout(timeout)
         self.receiver_mode = False
         if sequence_generator is None:
@@ -98,12 +104,14 @@ class Client(object):
     def connect(self):
         """Connect to SMSC"""
 
-        logger.info('Connecting to %s:%s...', self.host, self.port)
-
         try:
-            if self._socket is None:
-                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._socket.connect((self.host, self.port))
+            if self.unix_sock:
+                logger.info('Connecting to %s...', self.unix_sock)
+                self._socket.connect(self.unix_sock)
+            else:
+                logger.info('Connecting to %s:%s...', self.host, self.port)
+                self._socket.connect((self.host, self.port))
+
             self.state = consts.SMPP_CLIENT_STATE_OPEN
         except socket.error:
             raise exceptions.ConnectionError("Connection refused")
