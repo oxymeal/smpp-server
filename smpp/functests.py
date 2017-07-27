@@ -21,32 +21,15 @@ logging.basicConfig(level=logging.ERROR)
 TEST_SERVER_PORT = 2775
 
 
-def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None, **kwargs):
-    if unix_sock:
-        server = Server(unix_sock=unix_sock, **kwargs)
-    else:
-        server = Server(port=port, **kwargs)
-
-    sproc = threading.Thread(
-        target=server.run, kwargs={'sub_incoming': sub_incoming})
-    sproc.start()
-
-    # Wait for port to open
-
-    if unix_sock:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    else:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def wait_til_open(address_family, peer):
+    s = socket.socket(address_family, socket.SOCK_STREAM)
 
     CONNECTION_TIMEOUT = 2
     RETRIES_INTERVAL = 0.1
 
     waiting_time = 0
     while True:
-        if unix_sock:
-            res = s.connect_ex(unix_sock)
-        else:
-            res = s.connect_ex(('localhost', port))
+        res = s.connect_ex(peer)
 
         if res == 0:
             s.close()
@@ -58,6 +41,22 @@ def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None
             raise RuntimeError("Server did not start")
 
         time.sleep(RETRIES_INTERVAL)
+
+
+def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None, **kwargs):
+    if unix_sock:
+        server = Server(unix_sock=unix_sock, **kwargs)
+    else:
+        server = Server(port=port, **kwargs)
+
+    sproc = threading.Thread(
+        target=server.run, kwargs={'sub_incoming': sub_incoming})
+    sproc.start()
+
+    if unix_sock:
+        wait_til_open(socket.AF_UNIX, unix_sock)
+    else:
+        wait_til_open(socket.AF_INET, ('localhost', port))
 
     return server, sproc
 
