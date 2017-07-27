@@ -254,6 +254,9 @@ class IncomingQueueTestCase(unittest.TestCase):
     INC_QUEUE_URL = 'tcp://127.0.0.1:25555'
     INC_QUEUE_2_URL = 'tcp://127.0.0.1:25556'
 
+    UNI_SERVER_SOCK = '/tmp/smpp-server-incq-uniserver.sock'
+    UNI_SERVER_QUEUE = 'tcp://127.0.0.1:25557'
+
     def setUp(self):
         self.provider = self.DummyProvider()
 
@@ -275,16 +278,24 @@ class IncomingQueueTestCase(unittest.TestCase):
             provider=self.provider,
             sub_incoming=[self.INC_QUEUE_URL, self.INC_QUEUE_2_URL])
 
+        self.uniserver, self.unithread = start_server_thread(
+            unix_sock=self.UNI_SERVER_SOCK,
+            provider=self.provider,
+            incoming_queue=self.UNI_SERVER_QUEUE,
+            sub_incoming=[self.UNI_SERVER_QUEUE])
+
     def tearDown(self):
         self.pub_server.stop()
         self.pub_server_2.stop()
         self.sub_server.stop()
         self.sub_server_2.stop()
+        self.uniserver.stop()
 
         self.pub_thread.join()
         self.pub_thread_2.join()
         self.sub_thread.join()
         self.sub_thread_2.join()
+        self.unithread.join()
 
     def assert_resp_valid(self, submit_resp, dsm):
         msg_id_regex = r'^id:(\S+) .+'
@@ -371,6 +382,26 @@ class IncomingQueueTestCase(unittest.TestCase):
 
         dsm2 = subc2.read_pdu()
         self.assert_resp_valid(submit_resp_2, dsm2)
+
+    def test_self_listening_queue_server(self):
+        c = Client(unix_sock=self.UNI_SERVER_SOCK, timeout=1)
+        c.connect()
+        c.bind_transceiver(system_id="qtc", password="pwd")
+
+        c.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b00000001,
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=b'Hello world')
+
+        submit_resp = c.read_pdu()
+        deliv_sm = c.read_pdu()
+        self.assert_resp_valid(submit_resp, deliv_sm)
 
 
 class MessagingTestCase(unittest.TestCase):
