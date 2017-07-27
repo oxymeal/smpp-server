@@ -1,9 +1,12 @@
 import asyncio
+import json
 import logging
 import os
 import struct
+import zmq
 from collections import defaultdict
 from enum import Enum
+from threading import Thread
 from typing import Iterator, Optional, Tuple
 
 from . import external, parse, messaging
@@ -110,12 +113,23 @@ class Client:
 
 
 class Server:
-    def __init__(self, host='0.0.0.0', port=2775, unix_sock=None, provider: external.Provider = None):
+    INCOMING_QUEUE_TOPIC = 'smppincoming'
+
+    def __init__(
+        self, host='0.0.0.0', port=2775, unix_sock=None,
+        provider: external.Provider = None, incoming_queue: str = None):
+
         self.host = host
         self.port = port
         self.unix_sock = unix_sock
 
         self.provider = provider
+
+        self.incoming_queue = incoming_queue
+        self._zmq_ctx = None
+        self._incoming_pub_socket = None
+        self._incoming_sub_socket = None
+        self._incoming_sub_thread = None
 
         # AsyncIO event loop, created by run()
         self.loop = None
@@ -158,13 +172,41 @@ class Server:
             if conn.can_receive():
                 yield conn
 
+    def _pub_incoming(self, system_id: str, pdu: parse.DeliverSm):
+        logger.debug('Publishing incoming message to {}'.format(self.incoming_queue))
+
+        data = {
+            'system_id': system_id,
+            'source_addr_ton': pdu.source_addr_ton,
+            'source_addr_npi': pdu.source_addr_npi,
+            'source_addr': pdu.source_addr,
+            'dest_addr_ton': pdu.dest_addr_ton,
+            'dest_addr_npi': pdu.dest_addr_npi,
+            'destination_addr': pdu.destination_addr,
+            'esm_class': pdu.esm_class,
+            'short_message': pdu.short_message,
+        }
+        msg = "{} {}".format(
+            self.INCOMING_QUEUE_TOPIC, json.dumps(data))
+        self._incoming_pub_socket.send(msg.encode('ascii'))
+
+    async def _send_to_receivers_direct(self, system_id, pdu: parse.PDU):
+        recvs = self.get_receivers(system_id)
+        tasks = [c.send_new_seqnum(pdu) for c in recvs]
+        await asyncio.gather(*tasks, loop=self.loop)
+
     async def send_to_receivers(self, system_id: str, pdu: parse.PDU):
         logger.debug('Sending {} for all receivers of {}'.format(
             pdu.command, system_id))
 
-        recvs = self.get_receivers(system_id)
-        tasks = [c.send_new_seqnum(pdu) for c in recvs]
-        await asyncio.gather(*tasks, loop=self.loop)
+        if self.incoming_queue and isinstance(pdu, parse.DeliverSm):
+            self._pub_incoming(system_id, pdu)
+        else:
+            if self.incoming_queue:
+                logger.warning(
+                    'Attempted to deliver PDU {} to receivers using incoming queue, but that command is not supported.'.format(
+                        pdu.command))
+            await self._send_to_receivers_direct(system_id, pdu)
 
     async def do_bind(self, conn: Connection, pdu: parse.PDU) -> parse.PDU:
         if pdu.command == parse.Command.BIND_RECEIVER:
@@ -260,14 +302,65 @@ class Server:
         conn.w.close()
         self._unbind(conn)
 
-    def run(self):
+    async def _dispatch_incoming_msg(self, msg: str):
+        logger.debug('Incoming message')
+        split_ind = msg.find(' ')
+        data = msg[split_ind+1:]
+        pdu_dict = json.loads(data)
+
+        system_id = pdu_dict['system_id']
+        logger.debug('Incoming message to {}'.format(system_id))
+
+        migrate_attrs = ['source_addr_ton', 'source_addr_npi', 'source_addr',
+                         'dest_addr_ton', 'dest_addr_npi', 'destination_addr',
+                         'esm_class', 'short_message']
+        dsm = parse.DeliverSm()
+        for attr in migrate_attrs:
+            if attr in pdu_dict:
+                setattr(dsm, attr, pdu_dict[attr])
+
+        await self._send_to_receivers_direct(system_id, dsm)
+
+    def _run_incoming_sub(self):
+        def dispatch_incoming():
+            try:
+                while True:
+                    msg = self._incoming_sub_socket.recv().decode('ascii')
+                    self.loop.call_soon_threadsafe(
+                        lambda: asyncio.ensure_future(self._dispatch_incoming_msg(msg), loop=self.loop))
+            except zmq.ContextTerminated:
+                pass
+
+            self._incoming_sub_socket.close()
+
+        self._incoming_sub_thread = Thread(target=dispatch_incoming)
+        self._incoming_sub_thread.start()
+
+    def run(self, sub_incoming=None):
+        logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
+
         self.loop = asyncio.new_event_loop()
+
+        if self.incoming_queue or sub_incoming:
+            self._zmq_ctx = zmq.Context()
+
+        if self.incoming_queue:
+            logger.debug('Setting up pub socker for incoming queue')
+            self._incoming_pub_socket = self._zmq_ctx.socket(zmq.PUB)
+            self._incoming_pub_socket.bind(self.incoming_queue)
+
+        if sub_incoming:
+            logger.debug('Setting up sub socket for incoming queue')
+            self._incoming_sub_socket = self._zmq_ctx.socket(zmq.SUB)
+            self._incoming_sub_socket.setsockopt_string(zmq.SUBSCRIBE, self.INCOMING_QUEUE_TOPIC)
+            for url in sub_incoming:
+                self._incoming_sub_socket.connect(url)
+
+            self._run_incoming_sub()
 
         async def conncb(r: asyncio.StreamReader, w: asyncio.StreamWriter):
             conn = Connection(self, r, w)
             await self._on_client_connected(conn)
-
-        logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
 
         if self.unix_sock:
             server_gen = asyncio.start_unix_server(conncb, self.unix_sock, loop=self.loop)
@@ -295,3 +388,12 @@ class Server:
 
         self.loop.call_soon_threadsafe(
             lambda: asyncio.ensure_future(_stop_cb(), loop=self.loop))
+
+        if self._incoming_pub_socket:
+            # Close pub socket directly.
+            # Sub socket will be closed by the receiving queue
+            # on context termination.
+            self.loop.call_soon_threadsafe(self._incoming_pub_socket.close)
+
+        if self._zmq_ctx:
+            self._zmq_ctx.term()

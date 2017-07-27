@@ -1,8 +1,8 @@
-import time
-import socket
-import unittest
 import re
+import socket
+import time
 import threading
+import unittest
 from typing import List
 
 from smpp import external
@@ -19,15 +19,17 @@ logging.basicConfig(level=logging.ERROR)
 
 
 TEST_SERVER_PORT = 2775
+TEST_SERVER_2_PORT = 2776
 
 
-def start_server_thread(unix_sock=None, **kwargs):
+def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None, **kwargs):
     if unix_sock:
         server = Server(unix_sock=unix_sock, **kwargs)
     else:
-        server = Server(port=TEST_SERVER_PORT, **kwargs)
+        server = Server(port=port, **kwargs)
 
-    sproc = threading.Thread(target=server.run)
+    sproc = threading.Thread(
+        target=server.run, kwargs={'sub_incoming': sub_incoming})
     sproc.start()
 
     # Wait for port to open
@@ -45,7 +47,7 @@ def start_server_thread(unix_sock=None, **kwargs):
         if unix_sock:
             res = s.connect_ex(unix_sock)
         else:
-            res = s.connect_ex(('localhost', TEST_SERVER_PORT))
+            res = s.connect_ex(('localhost', port))
 
         if res == 0:
             s.close()
@@ -232,6 +234,68 @@ class UnixSocketTestCase(unittest.TestCase):
 
         elink_resp = client.read_pdu()
         self.assertEqual(elink_resp.sequence, elink.sequence)
+
+
+class IncomingQueueTestCase(unittest.TestCase):
+    class DummyProvider:
+        def __init__(self):
+            self.status = external.DeliveryStatus.OK
+
+        async def authenticate(self, system_id: str, password: str) -> bool:
+            return True
+
+        async def deliver(self, sm: external.ShortMessage) -> external.DeliveryStatus:
+            return self.status
+
+    INC_QUEUE_URL = 'tcp://127.0.0.1:25555'
+
+    def setUp(self):
+        self.provider = self.DummyProvider()
+        self.pub_server, self.pub_thread = start_server_thread(
+            provider=self.provider,
+            incoming_queue=self.INC_QUEUE_URL)
+
+        self.sub_server, self.sub_thread = start_server_thread(
+            port=TEST_SERVER_2_PORT,
+            provider=self.provider,
+            sub_incoming=[self.INC_QUEUE_URL])
+
+    def tearDown(self):
+        self.pub_server.stop()
+        self.sub_server.stop()
+
+        self.pub_thread.join()
+        self.sub_thread.join()
+
+    def test_receipt_through_queue(self):
+        pubc = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        pubc.connect()
+        pubc.bind_transmitter(system_id="qtc", password="pwd")
+
+        subc = Client('localhost', TEST_SERVER_2_PORT, timeout=1)
+        subc.connect()
+        subc.bind_receiver(system_id="qtc", password="pwd")
+
+        pubc.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b00000001,
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=b'Hello world')
+
+        submit_resp = pubc.read_pdu()
+        deliv_sm = subc.read_pdu()
+
+        msg_id_regex = r'^id:(\S+) .+'
+        match = re.search(msg_id_regex, deliv_sm.short_message.decode('ascii'))
+        self.assertIsNotNone(match)
+
+        msg_id, = match.groups()
+        self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
 
 
 class MessagingTestCase(unittest.TestCase):
