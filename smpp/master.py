@@ -41,6 +41,9 @@ class MasterServer:
     def _queue_url_for_worker(self, i: int) -> str:
         return "tcp://127.0.0.1:{}".format(self.incoming_queue_base_port + i)
 
+    def _all_queue_ports(self) -> List[int]:
+        return [self.incoming_queue_base_port + i for i in range(self.workers_count)]
+
     def _all_queue_urls(self) -> List[str]:
         return [self._queue_url_for_worker(i) for i in range(self.workers_count)]
 

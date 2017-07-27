@@ -703,8 +703,11 @@ class MasterServerTestCase(unittest.TestCase):
             e.bind_receiver(system_id="nomtc", password="pwd")
             eavesdroppers.append(e)
 
-        # TODO: get rid of this
-        time.sleep(3)
+        for port in self.master._all_queue_ports():
+            wait_til_open(socket.AF_INET, ('localhost', port))
+
+        # Have to let workers establish pub-sub connection among eash other.
+        time.sleep(1)
 
         message_text = "Test message"
         t.send_message(
