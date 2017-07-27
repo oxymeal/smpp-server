@@ -19,7 +19,6 @@ logging.basicConfig(level=logging.ERROR)
 
 
 TEST_SERVER_PORT = 2775
-TEST_SERVER_2_PORT = 2776
 
 
 def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None, **kwargs):
@@ -247,16 +246,19 @@ class IncomingQueueTestCase(unittest.TestCase):
         async def deliver(self, sm: external.ShortMessage) -> external.DeliveryStatus:
             return self.status
 
+    PUB_SERVER_SOCK = '/tmp/smpp-server-incq-pubserver.sock'
+    SUB_SERVER_SOCK = '/tmp/smpp-server-incq-subserver.sock'
     INC_QUEUE_URL = 'tcp://127.0.0.1:25555'
 
     def setUp(self):
         self.provider = self.DummyProvider()
         self.pub_server, self.pub_thread = start_server_thread(
+            unix_sock=self.PUB_SERVER_SOCK,
             provider=self.provider,
             incoming_queue=self.INC_QUEUE_URL)
 
         self.sub_server, self.sub_thread = start_server_thread(
-            port=TEST_SERVER_2_PORT,
+            unix_sock=self.SUB_SERVER_SOCK,
             provider=self.provider,
             sub_incoming=[self.INC_QUEUE_URL])
 
@@ -268,11 +270,11 @@ class IncomingQueueTestCase(unittest.TestCase):
         self.sub_thread.join()
 
     def test_receipt_through_queue(self):
-        pubc = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        pubc = Client(unix_sock=self.PUB_SERVER_SOCK, timeout=1)
         pubc.connect()
         pubc.bind_transmitter(system_id="qtc", password="pwd")
 
-        subc = Client('localhost', TEST_SERVER_2_PORT, timeout=1)
+        subc = Client(unix_sock=self.SUB_SERVER_SOCK, timeout=1)
         subc.connect()
         subc.bind_receiver(system_id="qtc", password="pwd")
 
