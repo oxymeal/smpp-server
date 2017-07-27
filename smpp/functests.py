@@ -6,6 +6,7 @@ import unittest
 from typing import List
 
 from smpp import external
+from smpp.master import MasterServer
 from smpp.server import Server
 from smpp.vendor.smpplib import consts
 from smpp.vendor.smpplib.client import Client
@@ -15,7 +16,7 @@ from timeout_decorator import timeout
 
 
 import logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.DEBUG)
 
 
 TEST_SERVER_PORT = 2775
@@ -59,6 +60,16 @@ def start_server_thread(port=TEST_SERVER_PORT, unix_sock=None, sub_incoming=None
         wait_til_open(socket.AF_INET, ('localhost', port))
 
     return server, sproc
+
+
+def start_master_thread(port=TEST_SERVER_PORT, **kwargs):
+    master = MasterServer(port=port, **kwargs)
+    master_thread = threading.Thread(target=master.run)
+    master_thread.start()
+
+    wait_til_open(socket.AF_INET, ('localhost', port))
+
+    return master, master_thread
 
 
 class EnquireLinkTestCase(unittest.TestCase):
@@ -631,3 +642,24 @@ class MessagingTestCase(unittest.TestCase):
 
         with self.assertRaises(socket.timeout):
             r1.read_pdu()
+
+
+class MasterServerTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.master, self.thread = start_master_thread(workers_count=2)
+
+    def tearDown(self):
+        self.master.terminate()
+        self.thread.join()
+
+    def test_master_enquire_link(self):
+        c = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        c.connect()
+
+        elink = make_pdu('enquire_link', client=c)
+        elink.sequence = 12
+        c.send_pdu(elink)
+
+        resp = c.read_pdu()
+        self.assertEqual(elink.sequence, resp.sequence)
