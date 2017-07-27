@@ -76,12 +76,7 @@ class Connection:
         await self.send(pdu)
 
     async def send_to_rcv(self, pdu: parse.PDU):
-        logger.debug('Sending {} for all receivers of {}'.format(
-            pdu.command, self.system_id))
-
-        recvs = self.server.get_receivers(self.system_id)
-        tasks = [c.send_new_seqnum(pdu) for c in recvs]
-        await asyncio.gather(*tasks, loop=self.client.server.loop)
+        await self.server.send_to_receivers(self.system_id, pdu)
 
     @property
     def peer(self) -> Tuple[str, int]:
@@ -162,6 +157,14 @@ class Server:
         for conn in self._clients[sid].connections:
             if conn.can_receive():
                 yield conn
+
+    async def send_to_receivers(self, system_id: str, pdu: parse.PDU):
+        logger.debug('Sending {} for all receivers of {}'.format(
+            pdu.command, system_id))
+
+        recvs = self.get_receivers(system_id)
+        tasks = [c.send_new_seqnum(pdu) for c in recvs]
+        await asyncio.gather(*tasks, loop=self.loop)
 
     async def do_bind(self, conn: Connection, pdu: parse.PDU) -> parse.PDU:
         if pdu.command == parse.Command.BIND_RECEIVER:
