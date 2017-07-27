@@ -366,6 +366,11 @@ class Server:
             await self._on_client_connected(conn)
 
         if self.unix_sock:
+            if os.path.exists(self.unix_sock):
+                logger.warning(
+                    "Socket at '{}' already exists. Deleting it...".format(self.unix_sock))
+                os.remove(self.unix_sock)
+
             server_gen = asyncio.start_unix_server(conncb, self.unix_sock, loop=self.loop)
         else:
             server_gen = asyncio.start_server(conncb, self.host, self.port, loop=self.loop)
