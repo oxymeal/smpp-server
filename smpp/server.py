@@ -295,9 +295,9 @@ class Server:
                 await self._dispatch_pdu(conn, pdu)
 
         except asyncio.IncompleteReadError:
-            logger.error('Incomplete read from peer {}'.format(conn.peer))
+            logger.warning('Incomplete read from peer {}'.format(conn.peer))
         except ConnectionResetError:
-            logger.error('Connection was reset from peer {}'.format(conn.peer))
+            logger.warning('Connection was reset from peer {}'.format(conn.peer))
 
         conn.w.close()
         self._unbind(conn)
