@@ -247,27 +247,44 @@ class IncomingQueueTestCase(unittest.TestCase):
             return self.status
 
     PUB_SERVER_SOCK = '/tmp/smpp-server-incq-pubserver.sock'
+    PUB_SERVER_2_SOCK = '/tmp/smpp-server-incq-pubserver2.sock'
     SUB_SERVER_SOCK = '/tmp/smpp-server-incq-subserver.sock'
+    SUB_SERVER_2_SOCK = '/tmp/smpp-server-incq-subserver2.sock'
+
     INC_QUEUE_URL = 'tcp://127.0.0.1:25555'
+    INC_QUEUE_2_URL = 'tcp://127.0.0.1:25556'
 
     def setUp(self):
         self.provider = self.DummyProvider()
+
         self.pub_server, self.pub_thread = start_server_thread(
             unix_sock=self.PUB_SERVER_SOCK,
             provider=self.provider,
             incoming_queue=self.INC_QUEUE_URL)
+        self.pub_server_2, self.pub_thread_2 = start_server_thread(
+            unix_sock=self.PUB_SERVER_2_SOCK,
+            provider=self.provider,
+            incoming_queue=self.INC_QUEUE_2_URL)
 
         self.sub_server, self.sub_thread = start_server_thread(
             unix_sock=self.SUB_SERVER_SOCK,
             provider=self.provider,
-            sub_incoming=[self.INC_QUEUE_URL])
+            sub_incoming=[self.INC_QUEUE_URL, self.INC_QUEUE_2_URL])
+        self.sub_server_2, self.sub_thread_2 = start_server_thread(
+            unix_sock=self.SUB_SERVER_2_SOCK,
+            provider=self.provider,
+            sub_incoming=[self.INC_QUEUE_URL, self.INC_QUEUE_2_URL])
 
     def tearDown(self):
         self.pub_server.stop()
+        self.pub_server_2.stop()
         self.sub_server.stop()
+        self.sub_server_2.stop()
 
         self.pub_thread.join()
+        self.pub_thread_2.join()
         self.sub_thread.join()
+        self.sub_thread_2.join()
 
     def test_receipt_through_queue(self):
         pubc = Client(unix_sock=self.PUB_SERVER_SOCK, timeout=1)
@@ -298,6 +315,68 @@ class IncomingQueueTestCase(unittest.TestCase):
 
         msg_id, = match.groups()
         self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
+
+    def test_multiprod_multicons(self):
+        subc1 = Client(unix_sock=self.SUB_SERVER_SOCK, timeout=1)
+        subc1.connect()
+        subc1.bind_receiver(system_id="qtc", password="pwd")
+
+        subc2 = Client(unix_sock=self.SUB_SERVER_2_SOCK, timeout=1)
+        subc2.connect()
+        subc2.bind_receiver(system_id="qtc", password="pwd")
+
+        pubc1 = Client(unix_sock=self.PUB_SERVER_SOCK, timeout=1)
+        pubc1.connect()
+        pubc1.bind_transmitter(system_id="qtc", password="pwd")
+
+        pubc1.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b00000001,
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=b'Hello world')
+
+        submit_resp_1 = pubc1.read_pdu()
+
+        def assert_resp_valid(submit_resp, dsm):
+            msg_id_regex = r'^id:(\S+) .+'
+            match = re.search(msg_id_regex, dsm.short_message.decode('ascii'))
+            self.assertIsNotNone(match)
+            msg_id, = match.groups()
+            self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
+
+        dsm1 = subc1.read_pdu()
+        assert_resp_valid(submit_resp_1, dsm1)
+
+        dsm2 = subc2.read_pdu()
+        assert_resp_valid(submit_resp_1, dsm2)
+
+        pubc2 = Client(unix_sock=self.PUB_SERVER_2_SOCK, timeout=1)
+        pubc2.connect()
+        pubc2.bind_transmitter(system_id="qtc", password="pwd")
+
+        pubc2.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b00000001,
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=b'Hello world')
+
+        submit_resp_2 = pubc2.read_pdu()
+
+        dsm1 = subc1.read_pdu()
+        assert_resp_valid(submit_resp_2, dsm1)
+
+        dsm2 = subc2.read_pdu()
+        assert_resp_valid(submit_resp_2, dsm2)
 
 
 class MessagingTestCase(unittest.TestCase):
