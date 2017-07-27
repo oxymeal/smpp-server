@@ -16,7 +16,7 @@ from timeout_decorator import timeout
 
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 
 TEST_SERVER_PORT = 2775
@@ -645,13 +645,31 @@ class MessagingTestCase(unittest.TestCase):
 
 
 class MasterServerTestCase(unittest.TestCase):
+    class DummyProvider:
+        def __init__(self):
+            self.status = external.DeliveryStatus.OK
+
+        async def authenticate(self, system_id: str, password: str) -> bool:
+            return True
+
+        async def deliver(self, sm: external.ShortMessage) -> external.DeliveryStatus:
+            return self.status
 
     def setUp(self):
-        self.master, self.thread = start_master_thread(workers_count=2)
+        self.master, self.thread = start_master_thread(
+            workers_count=2, provider=self.DummyProvider())
 
     def tearDown(self):
         self.master.terminate()
         self.thread.join()
+
+    def assert_receipt_valid(self, submit_resp, receipt):
+        msg_id_re = r'^id:(\S+) .+'
+        match = re.search(msg_id_re, receipt.short_message.decode('ascii'))
+        self.assertIsNotNone(match)
+        msg_id, = match.groups()
+
+        self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
 
     def test_master_enquire_link(self):
         c = Client('localhost', TEST_SERVER_PORT, timeout=1)
@@ -663,3 +681,49 @@ class MasterServerTestCase(unittest.TestCase):
 
         resp = c.read_pdu()
         self.assertEqual(elink.sequence, resp.sequence)
+
+    def test_master_delivery_receipt(self):
+        t = Client('localhost', TEST_SERVER_PORT, timeout=1)
+        t.connect()
+        t.bind_transmitter(system_id="mtc", password="pwd")
+
+        RECEIVERS_COUNT = 6
+        receivers = []
+        for _ in range(RECEIVERS_COUNT):
+            r = Client('localhost', TEST_SERVER_PORT, timeout=1)
+            r.connect()
+            r.bind_receiver(system_id="mtc", password="pwd")
+            receivers.append(r)
+
+        EAVESDROPPERS_COUNT = 6
+        eavesdroppers = []
+        for _ in range(EAVESDROPPERS_COUNT):
+            e = Client('localhost', TEST_SERVER_PORT, timeout=1)
+            e.connect()
+            e.bind_receiver(system_id="nomtc", password="pwd")
+            eavesdroppers.append(e)
+
+        # TODO: get rid of this
+        time.sleep(3)
+
+        message_text = "Test message"
+        t.send_message(
+            esm_class=consts.SMPP_MSGMODE_STOREFORWARD,
+            registered_delivery=0b00000001, # Request delivery receipt
+            source_addr_ton=12,
+            source_addr_npi=34,
+            source_addr="src",
+            dest_addr_ton=56,
+            dest_addr_npi=67,
+            destination_addr="dst",
+            short_message=message_text.encode('ascii'))
+
+        submit_resp = t.read_pdu()
+
+        for r in receivers:
+            receipt = r.read_pdu()
+            self.assert_receipt_valid(submit_resp, receipt)
+
+        for e in eavesdroppers:
+            with self.assertRaises(socket.timeout):
+                e.read_pdu()
