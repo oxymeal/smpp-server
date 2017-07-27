@@ -286,6 +286,13 @@ class IncomingQueueTestCase(unittest.TestCase):
         self.sub_thread.join()
         self.sub_thread_2.join()
 
+    def assert_resp_valid(self, submit_resp, dsm):
+        msg_id_regex = r'^id:(\S+) .+'
+        match = re.search(msg_id_regex, dsm.short_message.decode('ascii'))
+        self.assertIsNotNone(match)
+        msg_id, = match.groups()
+        self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
+
     def test_receipt_through_queue(self):
         pubc = Client(unix_sock=self.PUB_SERVER_SOCK, timeout=1)
         pubc.connect()
@@ -308,13 +315,7 @@ class IncomingQueueTestCase(unittest.TestCase):
 
         submit_resp = pubc.read_pdu()
         deliv_sm = subc.read_pdu()
-
-        msg_id_regex = r'^id:(\S+) .+'
-        match = re.search(msg_id_regex, deliv_sm.short_message.decode('ascii'))
-        self.assertIsNotNone(match)
-
-        msg_id, = match.groups()
-        self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
+        self.assert_resp_valid(submit_resp, deliv_sm)
 
     def test_multiprod_multicons(self):
         subc1 = Client(unix_sock=self.SUB_SERVER_SOCK, timeout=1)
@@ -342,18 +343,11 @@ class IncomingQueueTestCase(unittest.TestCase):
 
         submit_resp_1 = pubc1.read_pdu()
 
-        def assert_resp_valid(submit_resp, dsm):
-            msg_id_regex = r'^id:(\S+) .+'
-            match = re.search(msg_id_regex, dsm.short_message.decode('ascii'))
-            self.assertIsNotNone(match)
-            msg_id, = match.groups()
-            self.assertEqual(msg_id, submit_resp.message_id.decode('ascii'))
-
         dsm1 = subc1.read_pdu()
-        assert_resp_valid(submit_resp_1, dsm1)
+        self.assert_resp_valid(submit_resp_1, dsm1)
 
         dsm2 = subc2.read_pdu()
-        assert_resp_valid(submit_resp_1, dsm2)
+        self.assert_resp_valid(submit_resp_1, dsm2)
 
         pubc2 = Client(unix_sock=self.PUB_SERVER_2_SOCK, timeout=1)
         pubc2.connect()
@@ -373,10 +367,10 @@ class IncomingQueueTestCase(unittest.TestCase):
         submit_resp_2 = pubc2.read_pdu()
 
         dsm1 = subc1.read_pdu()
-        assert_resp_valid(submit_resp_2, dsm1)
+        self.assert_resp_valid(submit_resp_2, dsm1)
 
         dsm2 = subc2.read_pdu()
-        assert_resp_valid(submit_resp_2, dsm2)
+        self.assert_resp_valid(submit_resp_2, dsm2)
 
 
 class MessagingTestCase(unittest.TestCase):
