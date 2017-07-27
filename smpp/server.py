@@ -337,7 +337,10 @@ class Server:
         self._incoming_sub_thread.start()
 
     def run(self, sub_incoming=None):
-        logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
+        if self.unix_sock:
+            logger.info("Starting SMPP server at {}".format(self.unix_sock))
+        else:
+            logger.info("Starting SMPP server at {}:{}".format(self.host, self.port))
 
         self.loop = asyncio.new_event_loop()
 
