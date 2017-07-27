@@ -1,21 +1,24 @@
+import os
 from . import DeliveryStatus, ShortMessage
 
 class Provider:
     """
-    Этот класс используется как интерфейс к внешнему доставщику сообщений.
+    Базовый провайдер, который аутентифицирует всех пользователей и
+    логгирует отправляемые смс в файл.
     """
 
-    def authenticate(self, system_id: str, password: str) -> bool:
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+    async def authenticate(self, system_id: str, password: str) -> bool:
+        # Аутентифицировать всех пользователей
         return True
 
-    def deliver(self, sm: ShortMessage) -> DeliveryStatus:
-        """
-        Метод выполняет попытку доставки короткого сообщения и возвращает
-        один и перечисленных в DeliveryStatus результатов отправки.
-        """
+    async def deliver(self, sm: ShortMessage) -> DeliveryStatus:
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
 
-        f = open('container/sms.txt', 'a')
-        f.write(str(sm.__dict__))
-        f.write("\n")
+        with open(self.file_path, 'a') as f:
+            f.write(str(sm.__dict__))
+            f.write("\n")
 
-        return random.choice(list(DeliveryStatus))
+        return DeliveryStatus.OK
