@@ -21,16 +21,19 @@ class ShortMessage:
 
 
 class DeliveryStatus(Enum):
-    OK = 0
-    GENERIC_ERROR = 1 # Неуказанная ошибка
-    AUTH_FAILED = 2   # Неверный system_id/пароль
-    NO_BALANCE = 3    # Недостаточно средств на счете
-    UNDELIVERABLE = 4 # Сообщение не может быть доставлено из-за какой-либо ошибки в запросе отправки
-    TRY_LATER = 5     # Повторную попытку отправки следует совершить чуть позже
+    DELIVERED = 0 # Доставлено
+    EXPIRED = 1 # Время на доставку истекло
+    DELETED = 2 # Сообщение удалено до доставки
+    UNDELIVERABLE = 3 # Сообщение недостовляемо
+    ACCEPTED = 4 # Принято, но будет доставлено позже
+    UNKNOWN = 5 # Неизвестный статус
+    REJECTED = 6 # Отклонено
 
-    def should_retry(self):
-        return self in [DeliveryStatus.GENERIC_ERROR, DeliveryStatus.TRY_LATER]
-
+    # Особый статус, который сообщает серверу, что ему нужно предпринять еще
+    # одну попытки доставки чуть позже (еще раз вызвать метод deliver),
+    # если время жизни сообщений еще не истекло. Если сообщение устарело,
+    # клиенту будет отправлен статус EXPIRED.
+    TRY_LATER = 100
 
 class Provider:
     """

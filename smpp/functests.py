@@ -248,7 +248,7 @@ class UnixSocketTestCase(unittest.TestCase):
 class IncomingQueueTestCase(unittest.TestCase):
     class DummyProvider:
         def __init__(self):
-            self.status = external.DeliveryStatus.OK
+            self.status = external.DeliveryStatus.DELIVERED
 
         async def authenticate(self, system_id: str, password: str) -> bool:
             return True
@@ -417,7 +417,7 @@ class IncomingQueueTestCase(unittest.TestCase):
 class MessagingTestCase(unittest.TestCase):
     class DummyProvider:
         def __init__(self):
-            self.status = external.DeliveryStatus.OK
+            self.status = external.DeliveryStatus.DELIVERED
             self.mlock = threading.Lock()
             self.msem = threading.Semaphore(0)
             self.messages = []
@@ -610,13 +610,12 @@ class MessagingTestCase(unittest.TestCase):
         self.assertTrue(message_text.startswith(rct_text))
 
     def test_error_receipts(self):
-        self._test_error_receipt(external.DeliveryStatus.GENERIC_ERROR, 'EXPIRED')
-        self._test_error_receipt(external.DeliveryStatus.TRY_LATER, 'EXPIRED')
-
-        self._test_error_receipt(external.DeliveryStatus.AUTH_FAILED, 'REJECTD')
-        self._test_error_receipt(external.DeliveryStatus.NO_BALANCE, 'REJECTD')
-
+        self._test_error_receipt(external.DeliveryStatus.EXPIRED, 'EXPIRED')
+        self._test_error_receipt(external.DeliveryStatus.DELETED, 'DELETED')
         self._test_error_receipt(external.DeliveryStatus.UNDELIVERABLE, 'UNDELIV')
+        self._test_error_receipt(external.DeliveryStatus.ACCEPTED, 'ACCEPTD')
+        self._test_error_receipt(external.DeliveryStatus.UNKNOWN, 'UNKNOWN')
+        self._test_error_receipt(external.DeliveryStatus.REJECTED, 'REJECTD')
 
     def test_no_success_receipt_required(self):
         t = Client('localhost', TEST_SERVER_PORT, timeout=1)
@@ -647,7 +646,7 @@ class MessagingTestCase(unittest.TestCase):
 class MasterServerTestCase(unittest.TestCase):
     class DummyProvider:
         def __init__(self):
-            self.status = external.DeliveryStatus.OK
+            self.status = external.DeliveryStatus.DELIVERED
 
         async def authenticate(self, system_id: str, password: str) -> bool:
             return True
@@ -683,6 +682,9 @@ class MasterServerTestCase(unittest.TestCase):
         self.assertEqual(elink.sequence, resp.sequence)
 
     def test_master_delivery_receipt(self):
+        # Have to let workers establish pub-sub connection among eash other.
+        time.sleep(3)
+
         t = Client('localhost', TEST_SERVER_PORT, timeout=1)
         t.connect()
         t.bind_transmitter(system_id="mtc", password="pwd")
@@ -706,8 +708,6 @@ class MasterServerTestCase(unittest.TestCase):
         for port in self.master._all_queue_ports():
             wait_til_open(socket.AF_INET, ('localhost', port))
 
-        # Have to let workers establish pub-sub connection among eash other.
-        time.sleep(1)
 
         message_text = "Test message"
         t.send_message(

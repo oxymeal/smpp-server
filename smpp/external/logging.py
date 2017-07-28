@@ -21,4 +21,4 @@ class Provider:
             f.write(str(sm.__dict__))
             f.write("\n")
 
-        return DeliveryStatus.OK
+        return DeliveryStatus.DELIVERED

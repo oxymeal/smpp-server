@@ -91,18 +91,13 @@ class Dispatcher:
         else:
             sm_validity_period = self.parse_validity_period(pdu.validity_period)
 
-        final_status = None
-        expired = False
         while True:
             status = await self.eprovider.deliver(sm)
 
-            if not status.should_retry():
-                final_status = status
-                break
+            if status == external.DeliveryStatus.TRY_LATER and datetime.now() < sm_validity_period:
+                continue
 
-            if datetime.now() < sm_validity_period:
-                expired = True
-                break
+            break
 
         # Return the delivery receipt pdu
 
@@ -120,22 +115,28 @@ class Dispatcher:
         dr.id = message_id
         dr.text = sm.body
 
-        if final_status == external.DeliveryStatus.OK:
+        if status == external.DeliveryStatus.DELIVERED:
             dr.dlvrd = 1
             dr.err = 0
         else:
             dr.dlvrd = 0
             dr.err = 1
 
-        if final_status == external.DeliveryStatus.OK:
+        if status == external.DeliveryStatus.DELIVERED:
             dr.stat = parse.RECEIPT_DELIVERED
-        elif final_status == external.DeliveryStatus.UNDELIVERABLE:
+        elif status == external.DeliveryStatus.EXPIRED:
+            dr.stat = parse.RECEIPT_EXPIRED
+        elif status == external.DeliveryStatus.DELETED:
+            dr.stat = parse.RECEIPT_DELETED
+        elif status == external.DeliveryStatus.UNDELIVERABLE:
             dr.stat = parse.RECEIPT_UNDELIVERABLE
-        elif final_status == external.DeliveryStatus.NO_BALANCE:
+        elif status == external.DeliveryStatus.ACCEPTED:
+            dr.stat = parse.RECEIPT_ACCEPTED
+        elif status == external.DeliveryStatus.UNKNOWN:
+            dr.stat = parse.RECEIPT_UNKNOWN
+        elif status == external.DeliveryStatus.REJECTED:
             dr.stat = parse.RECEIPT_REJECTED
-        elif final_status == external.DeliveryStatus.AUTH_FAILED:
-            dr.stat = parse.RECEIPT_REJECTED
-        elif expired:
+        elif status == external.DeliveryStatus.TRY_LATER:
             dr.stat = parse.RECEIPT_EXPIRED
         else:
             dr.stat = parse.RECEIPT_UNKNOWN
