@@ -202,4 +202,4 @@ class Dispatcher:
             nack = parse.GenericNack()
             nack.sequence_number = pdu.sequence_number
             nack.command_status = parse.COMMAND_STATUS_ESME_RUNKNOWNERR
-            await rs.send_to_rcv(nack)
+            await rs.send(nack)
