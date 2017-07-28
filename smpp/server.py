@@ -263,10 +263,12 @@ class Server:
             logger.error("Generick NACK from {} at {}; status: {}".format(
                 conn.system_id, conn.peer, pdu.command_status))
             return
+        elif pdu.command == parse.Command.DELIVER_SM_RESP:
+            logger.info("DeliverSmResp from {} at {}".format(
+                conn.system_id, conn.peer))
+            return
 
         if not conn.can_transmit():
-            # TODO: Check the command.
-            # Some receiver responses must be allowed here.
             logger.error('Invalid bind status ({}) for command {} from {} at {}'.format(
                 conn.mode, pdu.command, conn.system_id, conn.peer))
             nack = parse.GenericNack()
