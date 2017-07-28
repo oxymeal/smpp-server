@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
+import config
 import logging
-import random
-from enum import Enum
+from smpp.master import MasterServer
 
-from smpp.server import Server
-from smpp.external import logging as ext_logging
+logger = logging.getLogger(__name__)
 
+def main():
+    master = MasterServer(
+        host=config.HOST,
+        port=config.PORT,
+        provider=config.EXTERNAL_PROVIDER,
+        workers_count=config.WORKERS_COUNT,
+        worker_socket_template=config.WORKER_SOCKET_TEMPLATE,
+        incoming_queue_base_port=config.INCOMING_MESSAGES_QUEUE_BASE_PORT)
 
-logging.basicConfig(level=logging.DEBUG)
+    try:
+        master.run()
+    except KeyboardInterrupt:
+        logger.info("Shutting down master server...")
+        master.terminate()
+        logger.info("Shut down.")
 
-
-s = Server(provider=ext_logging.Provider(file_path='container/sms.txt'))
-s.run()
+if __name__ == '__main__':
+    main()
