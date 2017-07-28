@@ -259,6 +259,10 @@ class Server:
             resp.sequence_number = pdu.sequence_number
             await conn.send(resp)
             return
+        elif pdu.command == parse.Command.GENERIC_NACK:
+            logger.error("Generick NACK from {} at {}; status: {}".format(
+                conn.system_id, conn.peer, pdu.command_status))
+            return
 
         if not conn.can_transmit():
             # TODO: Check the command.
