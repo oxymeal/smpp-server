@@ -552,6 +552,40 @@ def decode_string(bs: bytearray, coding: int) -> str:
         raise UnicodeDecodeError('unsupported data_coding: {}'.format(coding))
 
 
+def gsm_encode(s: str) -> bytearray:
+    res = bytearray()
+    for c in s:
+        idx = gsm.find(c)
+        if idx != -1:
+            res.append(idx)
+            continue
+
+        idx = ext.find(c)
+        if idx != -1:
+            res.append(27)
+            res.append(idx)
+            continue
+
+        raise UnicodeEncodeError(
+            "smsc default alphabet can't encode character '{}'".format(c))
+    return res
+
+
+def encode_string(s: str) -> Tuple[int, bytes]:
+    """
+    Кодирует строку в одну из поддерживает кодировок.
+    Возвращает код кодировки и байты закодированной строки.
+    """
+    try:
+        bs = gsm_encode(s)
+        return DATA_CODING_SMSC_DEFAULT_ALPHABET, bs
+    except UnicodeEncodeError:
+        pass
+
+    bs = s.encode('utf_16_be')
+    return DATA_CODING_ISO_10646, bs
+
+
 def _unpack_octect_bytes(bs: bytearray,
                          sm_length: int) -> Tuple[bytearray, bytearray]:
     return bs[:sm_length], bs[sm_length:]
@@ -913,6 +947,8 @@ class DeliverSm(PDU):
                  + smdid_size + sms_size + sm_size
 
     def pack(self) -> bytearray:
+        data_coding, short_message_bytes = encode_string(self.short_message)
+
         bs = self._pack_header()
         bs += _pack_str(self.service_type, 6)
         bs += _pack_fmt('!BB', self.source_addr_ton, self.source_addr_npi)
@@ -922,9 +958,9 @@ class DeliverSm(PDU):
         bs += _pack_fmt('!BBB', self.esm_class, self.protocol_id, self.priority_flag)
         bs += b'\x00\x00' # schedule_delivery_time and validity_period
         bs += _pack_fmt('!BBBB', self.registered_delivery, self.replace_if_present_flag,
-                        self.data_coding, self.sm_default_msg_id)
-        bs += _pack_fmt('!B', len(self.short_message))
-        bs += self.short_message.encode('ascii')
+                        data_coding, self.sm_default_msg_id)
+        bs += _pack_fmt('!B', len(short_message_bytes))
+        bs += short_message_bytes
         return bs
 
 
