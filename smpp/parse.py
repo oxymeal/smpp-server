@@ -495,6 +495,29 @@ class GenericNack(PDU):
         return p
 
 
+gsm = ("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
+       "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ`¿abcdefghijklmnopqrstuvwxyzäöñüà")
+ext = ("````````````````````^```````````````````{}`````\\````````````[~]`"
+       "|````````````````````````````````````€``````````````````````````")
+
+
+def gsm_decode(bs: bytearray) -> str:
+    res = bs
+    result = []
+    for c in res:
+        if c == 27:
+            c = next(res)
+            result.append(ext[c])
+        else:
+            result.append(gsm[c])
+    return ''.join(result)
+
+
+def _unpack_octect_bytes(bs: bytearray,
+                         sm_length: int) -> Tuple[bytearray, bytearray]:
+    return bs[:sm_length], bs[sm_length:]
+
+
 def _unpack_octet_string(bs: bytearray,
                          sm_length: int) -> Tuple[str, bytearray]:
     return bs[:sm_length].decode('ascii'), bs[sm_length:]
