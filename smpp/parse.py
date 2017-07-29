@@ -880,6 +880,13 @@ class DeliverSmResp(PDU):
         bs += self.message_id
         return bs
 
+    @classmethod
+    def unpack(cls, bs: bytearray) -> 'DeliverSmResp':
+        pdu = DeliverSmResp()
+        pdu._unpack_header(bs)
+        pdu.message_id, bs = unpack_coctet_string(bs)
+        return pdu
+
 
 class DataSm(PDU):
 
