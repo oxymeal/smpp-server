@@ -502,14 +502,20 @@ ext = ("````````````````````^```````````````````{}`````\\````````````[~]`"
 
 
 def gsm_decode(bs: bytearray) -> str:
-    res = bs
-    result = []
-    for c in res:
-        if c == 27:
-            c = next(res)
-            result.append(ext[c])
-        else:
-            result.append(gsm[c])
+    result = ""
+    extended = False
+    for c in bs:
+        try:
+            if c == 27:
+                extended = True
+            elif extended:
+                extended = False
+                result += ext[c]
+            else:
+                result += gsm[c]
+        except IndexError:
+            continue
+
     return ''.join(result)
 
 
