@@ -98,6 +98,20 @@ REGDEL_SMSC_RECEIPT_NOT_REQUIRED = 0b00000000
 REGDEL_SMSC_RECEIPT_ALWAYS = 0b00000001
 REGDEL_SMSC_RECEIPT_FAILURE = 0b00000010
 
+DATA_CODING_SMSC_DEFAULT_ALPHABET = 0b00000000
+DATA_CODING_ASCII = 0b00000001
+DATA_CODING_UNSPECIFIED_1 = 0b00000010
+DATA_CODING_LATIN1 = 0b00000011
+DATA_CODING_UNSPECIFIED_2 = 0b00000100
+DATA_CODING_JIS = 0b00000101
+DATA_CODING_CYRILLIC = 0b00000110
+DATA_CODING_LATIN_HEBREW = 0b00000111
+DATA_CODING_ISO_10646 = 0b00001000
+DATA_CODING_PICTOGRAM = 0b00001001
+DATA_CODING_MUSIC_CODES = 0b00001010
+DATA_CODING_EXTENDED_KANJI = 0b00001101
+DATA_CODING_KS_C_5601 = 0b00001110
+
 class PackingError(ValueError):
     """
     Исключения этого типа выбрасываются при ошибках кодирования пакета
@@ -519,6 +533,25 @@ def gsm_decode(bs: bytearray) -> str:
     return ''.join(result)
 
 
+def decode_string(bs: bytearray, coding: int) -> str:
+    if coding == DATA_CODING_SMSC_DEFAULT_ALPHABET:
+        return gsm_decode(bs)
+    elif coding == DATA_CODING_ASCII:
+        return bs.decode('ascii')
+    elif coding == DATA_CODING_UNSPECIFIED_1 or coding == DATA_CODING_UNSPECIFIED_2:
+        return bs.decode('unicode_escape')
+    elif coding == DATA_CODING_LATIN1:
+        return bs.decode('latin1')
+    elif coding == DATA_CODING_CYRILLIC:
+        return bs.decode('iso8859_5')
+    elif coding == DATA_CODING_LATIN_HEBREW:
+        return bs.decode('iso8859_8')
+    elif coding == DATA_CODING_ISO_10646:
+        return bs.decode('utf_16_be')
+    else:
+        raise UnicodeDecodeError('unsupported data_coding: {}'.format(coding))
+
+
 def _unpack_octect_bytes(bs: bytearray,
                          sm_length: int) -> Tuple[bytearray, bytearray]:
     return bs[:sm_length], bs[sm_length:]
@@ -626,7 +659,12 @@ class SubmitSm(PDU):
         pdu.data_coding = dc
         pdu.sm_default_msg_id = smdi
         pdu.sm_length = sl
-        pdu.short_message, _ = _unpack_octet_string(bs, pdu.sm_length)
+
+        sm_bytes, _ = _unpack_octect_bytes(bs, pdu.sm_length)
+        try:
+            pdu.short_message = decode_string(sm_bytes, pdu.data_coding)
+        except UnicodeDecodeError as e:
+            raise UnpackingError(e)
 
         return pdu
 
