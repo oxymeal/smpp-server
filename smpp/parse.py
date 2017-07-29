@@ -1230,4 +1230,7 @@ def unpack_pdu(bs: bytearray) -> PDU:
     size = struct.calcsize('!II')
     _, cid = struct.unpack("!II", bs[:size])
 
-    return _COMMAND_CLASSES[Command(cid)].unpack(bs)
+    try:
+        return _COMMAND_CLASSES[Command(cid)].unpack(bs)
+    except NotImplementedError:
+        raise UnpackingError("Failed to parse {}".format(Command(cid)))
