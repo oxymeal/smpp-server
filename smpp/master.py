@@ -2,7 +2,7 @@ import asyncio
 import logging
 import multiprocessing
 from collections import namedtuple
-from typing import List
+from typing import Callable, List
 
 from smpp import external
 from smpp.server import Server
@@ -17,14 +17,14 @@ class MasterServer:
     def __init__(
         self,
         host: str = '0.0.0.0', port: int = 2775,
-        provider: external.Provider = None,
+        build_provider: Callable[..., external.Provider] = None,
         workers_count: int = 1,
         worker_socket_template: str = '/tmp/smpp_server_{port}_worker_{i}.sock',
         incoming_queue_base_port: int = 25555):
 
         self.host = host
         self.port = port
-        self.provider = provider
+        self.build_provider = build_provider
         self.workers_count = workers_count
         self.worker_socket_template = worker_socket_template
         self.incoming_queue_base_port = incoming_queue_base_port
@@ -55,8 +55,12 @@ class MasterServer:
                 i, self._sock_for_worker(i), self._queue_url_for_worker(i)))
 
             server = Server(
-                unix_sock=self._sock_for_worker(i), provider=self.provider,
+                unix_sock=self._sock_for_worker(i),
                 incoming_queue=self._queue_url_for_worker(i))
+
+            if self.build_provider:
+                p = self.build_provider(server=server)
+                server.provider = p
 
             proc = multiprocessing.Process(
                 target=server.run, kwargs={'sub_incoming': self._all_queue_urls()})

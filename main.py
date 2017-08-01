@@ -9,7 +9,7 @@ def main():
     master = MasterServer(
         host=config.HOST,
         port=config.PORT,
-        provider=config.EXTERNAL_PROVIDER,
+        build_provider=config.PROVIDER_BUILDER,
         workers_count=config.WORKERS_COUNT,
         worker_socket_template=config.WORKER_SOCKET_TEMPLATE,
         incoming_queue_base_port=config.INCOMING_MESSAGES_QUEUE_BASE_PORT)

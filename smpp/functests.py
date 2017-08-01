@@ -656,7 +656,7 @@ class MasterServerTestCase(unittest.TestCase):
 
     def setUp(self):
         self.master, self.thread = start_master_thread(
-            workers_count=2, provider=self.DummyProvider())
+            workers_count=2, build_provider=lambda **kwargs: self.DummyProvider())
 
     def tearDown(self):
         self.master.terminate()

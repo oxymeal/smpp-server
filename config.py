@@ -7,7 +7,12 @@ WORKERS_COUNT = 2
 
 # Провайдер бэкенда отправки сообщений
 import smpp.external.logging
-EXTERNAL_PROVIDER = smpp.external.logging.Provider(file_path="container/sms.txt")
+
+def build_provider(server, **kwargs):
+    # После запуска сервера его event loop будет доступен в server.loop
+    return smpp.external.logging.Provider(file_path="container/sms.txt")
+
+PROVIDER_BUILDER = build_provider
 # Необходимо реализовать класс с таким же интерфейсом как у external.base.Provider
 # и соответствующим поведением.
 
