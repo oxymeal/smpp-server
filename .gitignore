@@ -102,3 +102,7 @@ ENV/
 /site
 
 # End of https://www.gitignore.io/api/python
+
+# IDE files
+.idea/
+.vscode/
